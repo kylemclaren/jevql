@@ -21,10 +21,11 @@ CREATE TABLE people (
 );
 
 CREATE TABLE tickets (
-  id      serial PRIMARY KEY,
-  subject text NOT NULL,
-  body    text NOT NULL,
-  status  text NOT NULL DEFAULT 'open'
+  id         serial PRIMARY KEY,
+  subject    text NOT NULL,
+  body       text NOT NULL,
+  status     text NOT NULL DEFAULT 'open',
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 INSERT INTO cities (name, country) VALUES

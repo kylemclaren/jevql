@@ -186,9 +186,12 @@ app.use(express.json())
 app.post("/api/search", async (req, res) => {
   const q = String(req.body.condition ?? "").replace(/'/g, "''")
   if (q.length < 3) return res.status(400).json({ error: "condition too short" })
+  // Same column list in both calls, so each row is judged once.
   const out = await db.query(
-    `SELECT id, subject, jev_prob(tickets, '${q}') AS relevance
-     FROM tickets WHERE status = 'open' AND jev((subject, body), '${q}')
+    `SELECT id, subject, jev_prob((t.subject, t.body), '${q}') AS relevance
+     FROM tickets t
+     WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
+       AND jev((t.subject, t.body), '${q}')
      ORDER BY relevance DESC LIMIT 20`,
     { maxRows: 500 },
   )
