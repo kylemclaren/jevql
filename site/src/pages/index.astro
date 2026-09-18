@@ -583,13 +583,11 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 14px; padding: 9px 22px 9px 9px; background: #fff; text-transform: none; text-align: left; box-shadow: 4px 4px 0 var(--ink); }
   .install-cta .prompt-pill:hover, .install-cta .prompt-pill.done { background: var(--lime); }
   .prompt-pill .coins { display: inline-flex; }
-  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -10px; box-shadow: 2px 2px 0 var(--ink); transition: transform 150ms; }
+  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: #fff; color: var(--ink); margin-left: -9px; box-shadow: 0 0 0 2px #fff; transition: transform 150ms; }
   .prompt-pill .coin:first-child { margin-left: 0; }
-  .prompt-pill:hover .coin { background: #fff; animation: jiggle 600ms ease-in-out calc(var(--i) * 90ms) 1; }
-  .prompt-pill:hover .coin:nth-child(1) { transform: translateY(-2px); }
-  .prompt-pill:hover .coin:nth-child(2) { transform: translateY(-4px); }
-  .prompt-pill:hover .coin:nth-child(3) { transform: translateY(-2px); }
-  @keyframes jiggle { 0% { rotate: 0deg; } 20% { rotate: -8deg; } 45% { rotate: 7deg; } 70% { rotate: -4deg; } 100% { rotate: 0deg; } }
+  .prompt-pill:hover .coin { animation: jiggle 450ms ease-in-out calc(var(--i) * 70ms) 1; }
+  .prompt-pill:hover .coin:nth-child(2) { transform: translateY(-2px); }
+  @keyframes jiggle { 0% { rotate: 0deg; } 25% { rotate: -3deg; } 55% { rotate: 2.5deg; } 100% { rotate: 0deg; } }
   .prompt-pill .pill-text { display: flex; flex-direction: column; gap: 3px; line-height: 1.1; }
   .prompt-pill .pill-text b { font: 900 .92rem/1 ui-monospace, monospace; }
   .prompt-pill .pill-text small { font: 600 .64rem/1 ui-monospace, monospace; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
