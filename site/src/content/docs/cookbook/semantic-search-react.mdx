@@ -5,7 +5,9 @@ section: Cookbook
 order: 40
 ---
 
-<video class="doc-video" src="/docs/semantic-search-react.mp4" poster="/docs/semantic-search-react-poster.png" autoplay loop muted playsinline aria-label="The finished component: two plain-English searches over support tickets, each returning ranked rows and what the search cost"></video>
+<video class="doc-video" src="/docs/semantic-search-react.mp4" poster="/docs/semantic-search-react-poster.png" autoplay loop muted playsinline aria-label="Keyword search finds nothing for 'someone wants a refund'; the same words through jev() find the ticket 'Charged twice' at 98%, with the SQL that ran"></video>
+
+*Left: a keyword search for "someone wants a refund" finds nothing, because none of those words appear in the tickets. Right: the same words through `jev()` find "Charged twice", and the panel underneath shows the SQL that ran.*
 
 You will build a `<SemanticSearch>` component. The user types something like *"customers who sound like they are about to churn"*, the component asks your API, the API turns the request into a jevql query, and the rows come back with what the query cost.
 
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
 
   try {
     const res = await db.query(sql, { maxRows: 500 })   // never judge more than 500 rows per search
-    return NextResponse.json({ columns: res.columns, rows: res.rows, stats: res.stats })
+    return NextResponse.json({ columns: res.columns, rows: res.rows, stats: res.stats, sql })
   } catch (e) {
     if (e instanceof JevqlError && e.code === "budget") {
       return NextResponse.json({ error: "Too many matching rows to search. Add a filter." }, { status: 422 })
@@ -88,7 +90,7 @@ Three things worth noticing:
 import { useEffect, useRef, useState } from "react"
 
 type Row = [id: number, subject: string, relevance: number]
-type Result = { rows: Row[]; stats: { judged: number; cache_hits: number; usd: number; elapsed_ms: number } | null }
+type Result = { rows: Row[]; stats: { judged: number; cache_hits: number; usd: number; elapsed_ms: number } | null; sql?: string }
 
 export function SemanticSearch({ table = "tickets" }: { table?: string }) {
   const [condition, setCondition] = useState("")
@@ -160,6 +162,12 @@ export function SemanticSearch({ table = "tickets" }: { table?: string }) {
               {result.stats.elapsed_ms} ms
             </p>
           )}
+          {result.sql && (
+            <details className="sql">
+              <summary>the SQL that ran</summary>
+              <pre>{result.sql}</pre>
+            </details>
+          )}
         </>
       )}
     </div>
@@ -203,6 +211,9 @@ The component ships without styles so it drops into whatever you have. If you wa
 .semantic-search [role="alert"] { margin-top: 16px; border-left: 5px solid var(--pink); background: #ecebe4; padding: 10px 12px; font-size: .85rem; }
 .semantic-search .footer { margin: 10px 0 0; color: var(--muted); font-size: .72rem; font-weight: 700; }
 .semantic-search p:not(.footer):not([role="alert"]) { margin-top: 16px; color: var(--muted); font-size: .9rem; }
+.semantic-search details.sql { margin-top: 12px; border: 1px solid var(--line); background: var(--panel); }
+.semantic-search details.sql summary { padding: 8px 12px; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.semantic-search details.sql pre { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); font: 600 .74rem/1.55 inherit; white-space: pre-wrap; }
 ```
 
 ## 4. Make it feel instant
@@ -225,17 +236,15 @@ app.use(express.json())
 app.post("/api/search", async (req, res) => {
   const q = String(req.body.condition ?? "").replace(/'/g, "''")
   if (q.length < 3) return res.status(400).json({ error: "condition too short" })
+  // Same column list in both calls, so each row is judged once.
+  const sql = `SELECT id, subject, jev_prob((t.subject, t.body), '${q}') AS relevance
+FROM tickets t
+WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
+  AND jev((t.subject, t.body), '${q}')
+ORDER BY relevance DESC LIMIT 20`
   try {
-    // Same column list in both calls, so each row is judged once.
-    const out = await db.query(
-      `SELECT id, subject, jev_prob((t.subject, t.body), '${q}') AS relevance
-       FROM tickets t
-       WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
-         AND jev((t.subject, t.body), '${q}')
-       ORDER BY relevance DESC LIMIT 20`,
-      { maxRows: 500 },
-    )
-    res.json({ columns: out.columns, rows: out.rows, stats: out.stats })
+    const out = await db.query(sql, { maxRows: 500 })
+    res.json({ columns: out.columns, rows: out.rows, stats: out.stats, sql })
   } catch (e) {
     // Always answer with JSON: budget guards are the user's problem, everything else is ours.
     if (e instanceof JevqlError && e.code === "budget") return res.status(422).json({ error: "Too many matching rows to search. Add a filter." })

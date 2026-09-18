@@ -23,3 +23,6 @@
 .semantic-search [role="alert"] { margin-top: 16px; border-left: 5px solid var(--pink); background: #ecebe4; padding: 10px 12px; font-size: .85rem; }
 .semantic-search .footer { margin: 10px 0 0; color: var(--muted); font-size: .72rem; font-weight: 700; }
 .semantic-search p:not(.footer):not([role="alert"]) { margin-top: 16px; color: var(--muted); font-size: .9rem; }
+.semantic-search details.sql { margin-top: 12px; border: 1px solid var(--line); background: var(--panel); }
+.semantic-search details.sql summary { padding: 8px 12px; font-size: .68rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.semantic-search details.sql pre { margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); font: 600 .74rem/1.55 inherit; white-space: pre-wrap; }
