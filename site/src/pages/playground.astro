@@ -1,0 +1,21 @@
+---
+import Layout from "@/layouts/main.astro"
+import Playground from "@/components/playground/Playground"
+import "@/styles/playground.css"
+---
+<Layout title="jevql playground" description="Run jev() queries against a demo Postgres from your browser.">
+  <main class="page pg-page">
+    <header class="mast">
+      <a class="brand" href="/">jevql <span class="docs-tag">playground</span></a>
+      <div class="mast-right">
+        <a class="repo-link" href="/docs/">docs</a>
+        <a class="repo-link" href="https://github.com/kylemclaren/jevql" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </header>
+    <section class="pg-intro">
+      <h1>Try it on a real database</h1>
+      <p class="lede">A demo store: 2,000 customers, 6,000 orders, 3,000 reviews, 2,500 support tickets, 600 staff. Read-only. Write SQL with <code>jev()</code> in it, press run, and watch the bill.</p>
+    </section>
+    <Playground client:load />
+  </main>
+</Layout>

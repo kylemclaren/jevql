@@ -233,7 +233,7 @@ const tablesSQL = `SELECT n.nspname, c.relname,
   CASE c.relkind WHEN 'r' THEN 'table' WHEN 'p' THEN 'partitioned table' WHEN 'v' THEN 'view'
                  WHEN 'm' THEN 'materialized view' WHEN 'f' THEN 'foreign table' END
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+WHERE c.relkind IN ('r','p','v','m','f') AND n.nspname !~ '^pg_' AND c.relname !~ '^pg_' AND n.nspname <> 'information_schema'
 ORDER BY 1, 2`
 
 func (s *Server) schemaTables(w http.ResponseWriter, r *http.Request) {

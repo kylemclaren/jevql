@@ -32,8 +32,9 @@ type Server struct {
 	Log     func(format string, args ...any)
 	// CacheAdmin enables GET/DELETE /v1/cache. Off by default when the
 	// server is reachable beyond loopback.
-	CacheAdmin bool
-	MCP        http.Handler // optional: mounted at /mcp behind the bearer check
+	CacheAdmin  bool
+	MCP         http.Handler // optional: mounted at /mcp behind the bearer check
+	CORSOrigins []string     // browser origins allowed to call the API ("*" for any)
 
 	mu sync.Mutex // pgx connections are not safe for concurrent use
 }
@@ -41,6 +42,41 @@ type Server struct {
 // Handler returns the routed http.Handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	if len(s.CORSOrigins) > 0 {
+		return s.cors(s.routes(mux))
+	}
+	return s.routes(mux)
+}
+
+// cors answers preflight requests and stamps allowed origins on responses.
+func (s *Server) cors(h http.Handler) http.Handler {
+	allowed := func(origin string) string {
+		for _, o := range s.CORSOrigins {
+			if o == "*" || strings.EqualFold(o, origin) {
+				return origin
+			}
+		}
+		return ""
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			if ok := allowed(origin); ok != "" {
+				w.Header().Set("Access-Control-Allow-Origin", ok)
+				w.Header().Set("Vary", "Origin")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Max-Age", "600")
+			}
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) routes(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("/v1/health", s.health)
 	mux.HandleFunc("/v1/query", s.query)
 	mux.HandleFunc("/v1/explain", s.explain)

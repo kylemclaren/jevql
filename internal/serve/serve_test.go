@@ -349,3 +349,22 @@ func TestSchemaEndpoints(t *testing.T) {
 		t.Errorf("missing: %d %s", code, body)
 	}
 }
+
+func TestCORS(t *testing.T) {
+	s := &Server{Token: "x", Version: "t", Model: "m", CORSOrigins: []string{"https://jevql.fly.dev"}}
+	h := s.Handler()
+	req := httptest.NewRequest(http.MethodOptions, "/v1/query", nil)
+	req.Header.Set("Origin", "https://jevql.fly.dev")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 204 || rr.Header().Get("Access-Control-Allow-Origin") != "https://jevql.fly.dev" {
+		t.Errorf("preflight: %d %v", rr.Code, rr.Header())
+	}
+	req = httptest.NewRequest(http.MethodOptions, "/v1/query", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("unknown origin must not be allowed")
+	}
+}

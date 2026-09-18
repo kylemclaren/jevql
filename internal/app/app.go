@@ -80,6 +80,7 @@ type Config struct {
 	CacheAdmin  bool
 	MCP         bool
 	AllowWrites bool
+	CORS        string
 	Listen      string
 	Token       string
 	ShowVersion bool
@@ -117,7 +118,13 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.Float64Var(&c.Threshold, "threshold", thr, "default jev() threshold (or $JEV_THRESHOLD)")
 	fs.IntVar(&c.BatchSize, "batch-size", 40, "rows per TypeSafe request")
 	fs.IntVar(&c.Concurrency, "concurrency", 6, "concurrent TypeSafe requests")
-	fs.IntVar(&c.MaxRows, "max-rows", 2500, "abort before any HTTP call if collect exceeds this many rows (0 = off)")
+	maxRows := 2500
+	if v := os.Getenv("JEVQL_MAX_ROWS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			maxRows = n
+		}
+	}
+	fs.IntVar(&c.MaxRows, "max-rows", maxRows, "abort before any HTTP call if collect exceeds this many rows (0 = off; default $JEVQL_MAX_ROWS)")
 	fs.IntVar(&c.MaxChars, "max-chars", 0, "abort if row objects exceed this many chars in total (0 = off)")
 	fs.StringVar(&c.CachePath, "cache", cache.DefaultPath(), "answer cache path")
 	fs.BoolVar(&c.NoCache, "no-cache", false, "disable the answer cache")
@@ -134,6 +141,7 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.StringVar(&c.Token, "token", os.Getenv("JEVQL_TOKEN"), "bearer token required by `jevql serve` (default $JEVQL_TOKEN)")
 	fs.BoolVar(&c.ReadyJSON, "ready-json", false, "serve: print a JSON line with the bound address on stdout once listening (for SDKs)")
 	fs.IntVar(&c.ParentPID, "parent-pid", 0, "serve: exit when this process id goes away (for SDKs that embed the engine)")
+	fs.StringVar(&c.CORS, "cors", os.Getenv("JEVQL_CORS"), "serve: comma-separated browser origins allowed to call the API, or * (default $JEVQL_CORS)")
 	fs.BoolVar(&c.AllowWrites, "allow-writes", false, "mcp/serve: let MCP tools run non-SELECT statements")
 	fs.BoolVar(&c.Insecure, "insecure", false, "serve: allow listening on a non-loopback address without a token")
 	fs.BoolVar(&c.CacheAdmin, "allow-cache-admin", os.Getenv("JEVQL_ALLOW_CACHE_ADMIN") != "", "serve: enable GET/DELETE /v1/cache (default $JEVQL_ALLOW_CACHE_ADMIN)")
@@ -355,7 +363,13 @@ func (s *session) serve(ctx context.Context) int {
 		s.ui.errorf("refusing to listen on %s without a token: set --token / JEVQL_TOKEN, or pass --insecure", s.cfg.Listen)
 		return ExitSQL
 	}
-	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model, CacheAdmin: s.cfg.CacheAdmin,
+	var origins []string
+	for _, o := range strings.Split(s.cfg.CORS, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			origins = append(origins, o)
+		}
+	}
+	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model, CacheAdmin: s.cfg.CacheAdmin, CORSOrigins: origins,
 		MCP: mcpserver.Handler(mcpserver.New(s.ex, mcpserver.Options{Version: version, AllowWrites: s.cfg.AllowWrites, MaxRows: s.cfg.MaxRows}))}
 	if s.cfg.Verbose {
 		srv.Log = func(format string, args ...any) { s.ui.notef("serve: "+format, args...) }
