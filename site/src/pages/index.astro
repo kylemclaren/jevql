@@ -18,6 +18,9 @@ const db = new Jevql() // bundled engine, reads DATABASE_URL and TYPESAFE_API_KE
 const tickets = await db.queryObjects(\`
   SELECT id, subject FROM tickets
   WHERE jev(tickets, 'is about billing') AND status = 'open'\`)`
+const mcpExample = `claude mcp add jevql -- jevql mcp        # Claude Code, on stdio
+# or any MCP client, over HTTP, against a shared node:
+# https://your-node.fly.dev/mcp  +  Authorization: Bearer <token>`
 const pyExample = `from jevql import Jevql
 
 with Jevql() as db:  # bundled engine; Jevql(url=...) for a shared one
@@ -147,6 +150,25 @@ const install = "brew install kylemclaren/tap/jevql"
         <div><Code code={tsExample} lang="ts" theme="github-light" /><p class="fine"><code>npm i jevql</code>. The engine ships inside the package; nothing else to install. Point it at a shared <code>jevql serve</code> with <code>{"{"} url {"}"}</code>.</p></div>
         <div><Code code={pyExample} lang="python" theme="github-light" /><p class="fine"><code>pip install jevql</code>. Standard library only, engine included. Same embedded-or-remote choice.</p></div>
       </Tabs>
+    </section>
+
+    <section class="machine mcp" aria-labelledby="mcp-title">
+      <div class="section-head">
+        <div><p class="eyebrow">mcp</p><h2 id="mcp-title">Agents get the same superpower</h2></div>
+        <a class="repo-link" href="/docs/mcp/">mcp docs</a>
+      </div>
+      <p class="mcp-lede">
+        <code>jevql mcp</code> is a Model Context Protocol server. Claude, Cursor or any MCP client can ask your database
+        real questions: the <code>query</code> tool runs SQL with <code>jev()</code> in it, <code>explain</code> prices a query before it runs,
+        <code>judge</code> scores rows the agent already holds, and <code>list_tables</code> / <code>describe_table</code> let it find its way around.
+        Read-only by default.
+      </p>
+      <Code code={mcpExample} lang="bash" theme="github-light" />
+      <div class="phases mcp-tools" aria-label="MCP tools">
+        <div class="phase"><small>query</small><strong>Semantic SQL</strong><span>"Which open tickets sound like churn risks?" becomes <code>WHERE jev(t, '…')</code> and comes back as rows.</span></div>
+        <div class="phase"><small>explain</small><strong>Price first</strong><span>Rows after filters, batches, tokens and dollars, with no TypeSafe call. Agents check before they spend.</span></div>
+        <div class="phase"><small>judge</small><strong>Rows in hand</strong><span>Score, classify or filter any JSON rows the agent already has, same cache, no database round trip.</span></div>
+      </div>
     </section>
 
     <section class="machine" aria-labelledby="install-title">
@@ -498,6 +520,12 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .copy-btn:active:not(:disabled) { transform: none; box-shadow: none; }
   .phase .copy-wrap { margin-top: 8px; }
   .phase .copy-wrap > pre { margin: 0; }
+
+  /* mcp section */
+  .mcp-lede { max-width: 820px; margin: 0 0 14px; font: 500 .98rem/1.55 Arial, sans-serif; }
+  .mcp-lede code { font-size: .88em; background: #ecebe4; padding: 1px 5px; }
+  .mcp .astro-code { margin: 0 0 16px; border: 1.5px solid var(--ink); padding: 12px 14px; font: 600 .74rem/1.55 ui-monospace, monospace; background: #fff !important; overflow-x: auto; }
+  .mcp-tools .phase span code { font-weight: 800; }
 
   /* method map */
   .method-map { grid-template-columns: 1fr auto 1fr auto 1fr; }
