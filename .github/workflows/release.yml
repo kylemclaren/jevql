@@ -1,0 +1,84 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.os }}/${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: darwin, arch: arm64, runner: macos-14 }
+          - { os: darwin, arch: amd64, runner: macos-13 }
+          - { os: linux, arch: amd64, runner: ubuntu-latest }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: build
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          go build -trimpath -ldflags "-s -w -X github.com/kylemclaren/jevql/internal/app.version=${VERSION}" -o jevql ./cmd/jevql
+          ./jevql --version
+          NAME="jevql_${VERSION}_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p "dist/${NAME}"
+          cp jevql README.md LICENSE "dist/${NAME}/"
+          tar -C "dist/${NAME}" -czf "dist/${NAME}.tar.gz" jevql README.md LICENSE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jevql-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: checksums
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+      - name: github release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/*.tar.gz artifacts/checksums.txt \
+            --title "jevql ${GITHUB_REF_NAME}" --generate-notes
+      - name: update homebrew tap
+        if: ${{ !contains(github.ref_name, '-') }}
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN secret is not set; skipping tap update (run scripts/brew-formula.sh manually)"
+            exit 0
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/kylemclaren/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          scripts/brew-formula.sh "$VERSION" artifacts/checksums.txt > tap/Formula/jevql.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/jevql.rb
+          git commit -m "jevql ${VERSION}" || echo "formula unchanged"
+          git push

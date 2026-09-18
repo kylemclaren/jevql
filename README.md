@@ -17,8 +17,18 @@ CLI using [TypeSafe](https://typesafe.ai)'s System One model (Jev). No
 
 ## Install
 
-Requires Go 1.23+ and a C compiler (libpg_query is bundled via
-[`pg_query_go`](https://github.com/pganalyze/pg_query_go) and needs CGO).
+Homebrew (macOS and Linux):
+
+```bash
+brew install kylemclaren/tap/jevql
+```
+
+Prebuilt binaries for macOS and Linux (arm64 and amd64) are attached to each
+[GitHub release](https://github.com/kylemclaren/jevql/releases) as
+`jevql_<version>_<os>_<arch>.tar.gz` with a `checksums.txt`.
+
+From source, with Go 1.23+ and a C compiler (libpg_query is bundled via
+[`pg_query_go`](https://github.com/pganalyze/pg_query_go) and needs CGO):
 
 ```bash
 CGO_ENABLED=1 go install github.com/kylemclaren/jevql/cmd/jevql@latest
@@ -211,3 +221,12 @@ Prior art: [`realZachi/pg-jev`](https://github.com/realZachi/pg-jev) (the
 extension whose function names this mirrors) and
 [`EugeneBoondock/jevsql`](https://github.com/EugeneBoondock/jevsql) (a
 two-pass client).
+
+## Releasing
+
+Tag a version and push it: `git tag v0.2.0 && git push origin v0.2.0`. The
+release workflow builds native CGO binaries for darwin/linux on arm64/amd64,
+attaches them plus `checksums.txt` to a GitHub release, and regenerates
+`Formula/jevql.rb` in [kylemclaren/homebrew-tap](https://github.com/kylemclaren/homebrew-tap)
+using `scripts/brew-formula.sh`. That step needs a `HOMEBREW_TAP_TOKEN`
+repository secret with push access to the tap.

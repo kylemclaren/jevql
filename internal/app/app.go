@@ -34,8 +34,11 @@ const (
 	ExitSQL       = 1
 	ExitAPI       = 2
 	defaultAPIURL = "https://api.typesafe.ai/v1/systemone"
-	version       = "0.1.0"
 )
+
+// version is overridden at release time via
+// -ldflags "-X github.com/kylemclaren/jevql/internal/app.version=1.2.3".
+var version = "dev"
 
 // Config is the parsed command line.
 type Config struct {
