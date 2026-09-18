@@ -4,6 +4,7 @@ package app
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -26,7 +27,9 @@ import (
 	"github.com/kylemclaren/jevql/internal/exec"
 	"github.com/kylemclaren/jevql/internal/parse"
 	"github.com/kylemclaren/jevql/internal/psqlout"
+	"github.com/kylemclaren/jevql/internal/serve"
 	"github.com/kylemclaren/jevql/internal/typesafe"
+	"github.com/kylemclaren/jevql/internal/wire"
 )
 
 const (
@@ -67,6 +70,10 @@ type Config struct {
 	Expanded    bool
 	Verbose     bool
 	Columns     string
+	JSONTable   bool
+	Serve       bool
+	Listen      string
+	Token       string
 	ShowVersion bool
 	Positional  []string
 }
@@ -114,10 +121,13 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.BoolVar(&c.Expanded, "x", false, "expanded output like \\x")
 	fs.BoolVar(&c.Verbose, "v", false, "verbose: batches, tokens, cost")
 	fs.StringVar(&c.Columns, "columns", "", "comma-separated columns to send for alias-form jev(alias, ...)")
+	fs.BoolVar(&c.JSONTable, "json-table", false, "machine output: one JSON document per statement (see sdk/PROTOCOL.md)")
+	fs.StringVar(&c.Listen, "listen", envOr("JEVQL_LISTEN", "127.0.0.1:7433"), "address for `jevql serve`")
+	fs.StringVar(&c.Token, "token", os.Getenv("JEVQL_TOKEN"), "bearer token required by `jevql serve` (default $JEVQL_TOKEN)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, "jevql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
-		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n\nFlags:")
+		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n  jevql serve [--listen 127.0.0.1:7433] [--token SECRET] [dbname | postgres://...]\n\nFlags:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nEnvironment: DATABASE_URL, PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, TYPESAFE_API_KEY, TYPESAFE_API_URL, JEV_THRESHOLD")
 	}
@@ -129,8 +139,12 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	if c.APIKey == "" {
 		c.APIKey = os.Getenv("TYPESAFE_API_KEY")
 	}
-	if c.CSV && c.JSON {
-		return nil, errors.New("--csv and --json are mutually exclusive")
+	if (c.CSV && c.JSON) || (c.JSONTable && (c.CSV || c.JSON)) {
+		return nil, errors.New("--csv, --json and --json-table are mutually exclusive")
+	}
+	if len(c.Positional) > 0 && c.Positional[0] == "serve" {
+		c.Serve = true
+		c.Positional = c.Positional[1:]
 	}
 	return c, nil
 }
@@ -249,10 +263,10 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	defer stop()
 
 	u := &ui{out: stdout, err: stderr, color: isTerminal(stdout), colorErr: isTerminal(stderr)}
-	if cfg.CSV || cfg.JSON {
+	if cfg.CSV || cfg.JSON || cfg.JSONTable {
 		u.color = false
 	}
-	interactive := isTerminal(stdin) && cfg.Command == "" && cfg.File == ""
+	interactive := isTerminal(stdin) && cfg.Command == "" && cfg.File == "" && !cfg.Serve
 	toSave := map[string]string{}
 	if interactive && !hasConnectionInfo(cfg) {
 		fmt.Fprintln(stderr, u.style(dimStyle, "No database configured (use a postgres:// URL, -h/-d flags, DATABASE_URL or PG* env).", u.colorErr))
@@ -290,6 +304,8 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	defer s.close()
 
 	switch {
+	case cfg.Serve:
+		return s.serve(ctx)
 	case cfg.Command != "":
 		return s.runScript(ctx, cfg.Command)
 	case cfg.File != "":
@@ -309,6 +325,27 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 		return s.runScript(ctx, string(data))
 	}
 	return s.repl(ctx)
+}
+
+// serve runs the local HTTP transport until interrupted.
+func (s *session) serve(ctx context.Context) int {
+	if s.cfg.APIKey == "" {
+		s.ui.warnf("no TypeSafe API key configured; jev queries will fail until TYPESAFE_API_KEY is set")
+	}
+	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model}
+	if s.cfg.Verbose {
+		srv.Log = func(format string, args ...any) { s.ui.notef("serve: "+format, args...) }
+	}
+	auth := "no token"
+	if s.cfg.Token != "" {
+		auth = "bearer token required"
+	}
+	s.ui.notef("jevql %s serving http://%s (%s, db %s); Ctrl-C to stop", version, s.cfg.Listen, auth, s.dbname)
+	if err := srv.ListenAndServe(ctx, s.cfg.Listen); err != nil {
+		s.ui.errorf("%v", err)
+		return ExitSQL
+	}
+	return ExitOK
 }
 
 // session is one connected CLI.
@@ -631,6 +668,16 @@ func (s *session) runStatement(ctx context.Context, sql string) error {
 		}
 		s.printError(err)
 		return err
+	}
+	if s.cfg.JSONTable {
+		enc := json.NewEncoder(s.ui.out)
+		if err := enc.Encode(wire.FromResult(res)); err != nil {
+			return err
+		}
+		if res.Stats != nil && s.cfg.Verbose {
+			s.ui.footer(res.Stats)
+		}
+		return nil
 	}
 	switch {
 	case res.Explain != nil:

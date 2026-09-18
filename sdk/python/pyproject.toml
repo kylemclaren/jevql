@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jevql"
+version = "0.1.0"
+description = "Python client for jevql: semantic SQL (jev()) on vanilla Postgres"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Kyle McLaren" }]
+keywords = ["postgres", "sql", "jev", "typesafe", "llm"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Database",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/kylemclaren/jevql"
+Repository = "https://github.com/kylemclaren/jevql"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jevql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

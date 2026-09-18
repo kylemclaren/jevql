@@ -192,6 +192,26 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
   applications. Cost is estimated at $0.042 per million input tokens; the
   `usage` figures in the footer come from the API.
 
+## SDKs
+
+The parser, rewriter, cache and TypeSafe client live in this Go module. Every
+SDK reuses them rather than re-implementing SQL analysis:
+
+- **Go** (`sdk/go`, package `github.com/kylemclaren/jevql/sdk/go`): in-process.
+  `jevql.New(ctx, jevql.Options{DatabaseURL: ...})`, then `Query`, `QueryMaps`, `Explain`.
+- **TypeScript** (`sdk/typescript`, npm `jevql`) and **Python** (`sdk/python`,
+  PyPI `jevql`): thin clients with two transports, a long-running
+  `jevql serve` over HTTP on localhost, or spawning `jevql --json-table` per
+  call. Both have zero runtime dependencies.
+
+The wire format shared by `jevql serve`, `jevql --json-table` and the SDKs is
+documented in `sdk/PROTOCOL.md`.
+
+```bash
+jevql serve --listen 127.0.0.1:7433 --token secret   # for the TS/Python HTTP transport
+jevql --json-table -c "SELECT 1"                      # one JSON document per statement
+```
+
 ## Development
 
 ```bash

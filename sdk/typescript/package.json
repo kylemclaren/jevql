@@ -1,0 +1,30 @@
+{
+  "name": "jevql",
+  "version": "0.1.0",
+  "description": "Client SDK for jevql: semantic SQL (jev()) on vanilla Postgres via `jevql serve` or the jevql CLI",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "prepublishOnly": "bun run build"
+  },
+  "repository": { "type": "git", "url": "https://github.com/kylemclaren/jevql", "directory": "sdk/typescript" },
+  "keywords": ["postgres", "sql", "jev", "typesafe", "semantic", "llm"],
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
