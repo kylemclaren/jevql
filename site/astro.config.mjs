@@ -8,7 +8,7 @@ import mdx from "@astrojs/mdx";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://jev-pg-dvft.sprites.app",
+  site: "https://jevql.fly.dev",
   vite: {
     plugins: [tailwindcss()],
     server: { allowedHosts: true },

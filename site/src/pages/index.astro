@@ -48,8 +48,9 @@ const install = "brew install kylemclaren/tap/jevql"
     <section class="hero">
       <h1>Ask your database <mark>a real question.</mark></h1>
       <p class="lede">
-        A psql-shaped CLI. Put <code>jev(people, 'could work from home')</code> in a WHERE clause: Postgres runs the SQL,
-        Jev judges the rows, you get a psql table. No extension to install, the server only sees plain SQL.
+        A psql-shaped CLI. Put
+        <code class="hero-snippet"><span class="kw">WHERE</span> <span class="fn">jev</span><span class="pn">(</span>people<span class="pn">,</span> <span class="str">'could work from home'</span><span class="pn">)</span></code>
+        in a query: Postgres runs the SQL, Jev judges the rows, you get a psql table. No extension to install, the server only sees plain SQL.
       </p>
       <div class="install-cta">
         <button id="download" type="button">
@@ -426,6 +427,11 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
 
 <style is:global>
   code { font: inherit; font-family: ui-monospace, monospace; font-weight: 800; }
+  .hero-snippet { display: inline; border: 1px solid var(--line); border-radius: 2px; background: #fff; padding: 3px 8px 4px; margin: 0 2px; font: 700 .82em/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; vertical-align: 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .hero-snippet .kw { color: var(--pink); }
+  .hero-snippet .fn { background: var(--lime); padding: 1px 3px; }
+  .hero-snippet .str, .hero-snippet .pn { color: var(--muted); }
+  .lede { line-height: 1.7; }
   .lede code { font-size: .9em; }
   .install-cta { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 26px; }
   .install-cta button { text-transform: none; padding: 18px 24px; font-size: .92rem; box-shadow: 4px 4px 0 var(--ink); }
