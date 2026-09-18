@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jevql"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python client for jevql: semantic SQL (jev()) on vanilla Postgres"
 readme = "README.md"
 license = "MIT"
