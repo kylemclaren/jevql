@@ -81,6 +81,7 @@ type Config struct {
 	MCP         bool
 	AllowWrites bool
 	CORS        string
+	RateLimit   int
 	Listen      string
 	Token       string
 	ShowVersion bool
@@ -141,9 +142,14 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.StringVar(&c.Token, "token", os.Getenv("JEVQL_TOKEN"), "bearer token required by `jevql serve` (default $JEVQL_TOKEN)")
 	fs.BoolVar(&c.ReadyJSON, "ready-json", false, "serve: print a JSON line with the bound address on stdout once listening (for SDKs)")
 	fs.IntVar(&c.ParentPID, "parent-pid", 0, "serve: exit when this process id goes away (for SDKs that embed the engine)")
+	rate := 0
+	if v := os.Getenv("JEVQL_RATE_LIMIT"); v != "" {
+		rate, _ = strconv.Atoi(v)
+	}
+	fs.IntVar(&c.RateLimit, "rate-limit", rate, "serve: max requests per minute per client IP (0 = off; default $JEVQL_RATE_LIMIT)")
 	fs.StringVar(&c.CORS, "cors", os.Getenv("JEVQL_CORS"), "serve: comma-separated browser origins allowed to call the API, or * (default $JEVQL_CORS)")
 	fs.BoolVar(&c.AllowWrites, "allow-writes", false, "mcp/serve: let MCP tools run non-SELECT statements")
-	fs.BoolVar(&c.Insecure, "insecure", false, "serve: allow listening on a non-loopback address without a token")
+	fs.BoolVar(&c.Insecure, "insecure", os.Getenv("JEVQL_INSECURE") != "", "serve: allow listening on a non-loopback address without a token (default $JEVQL_INSECURE)")
 	fs.BoolVar(&c.CacheAdmin, "allow-cache-admin", os.Getenv("JEVQL_ALLOW_CACHE_ADMIN") != "", "serve: enable GET/DELETE /v1/cache (default $JEVQL_ALLOW_CACHE_ADMIN)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
@@ -369,7 +375,7 @@ func (s *session) serve(ctx context.Context) int {
 			origins = append(origins, o)
 		}
 	}
-	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model, CacheAdmin: s.cfg.CacheAdmin, CORSOrigins: origins,
+	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model, CacheAdmin: s.cfg.CacheAdmin, CORSOrigins: origins, RatePerMinute: s.cfg.RateLimit,
 		MCP: mcpserver.Handler(mcpserver.New(s.ex, mcpserver.Options{Version: version, AllowWrites: s.cfg.AllowWrites, MaxRows: s.cfg.MaxRows}))}
 	if s.cfg.Verbose {
 		srv.Log = func(format string, args ...any) { s.ui.notef("serve: "+format, args...) }

@@ -32,9 +32,10 @@ type Server struct {
 	Log     func(format string, args ...any)
 	// CacheAdmin enables GET/DELETE /v1/cache. Off by default when the
 	// server is reachable beyond loopback.
-	CacheAdmin  bool
-	MCP         http.Handler // optional: mounted at /mcp behind the bearer check
-	CORSOrigins []string     // browser origins allowed to call the API ("*" for any)
+	CacheAdmin    bool
+	MCP           http.Handler // optional: mounted at /mcp behind the bearer check
+	CORSOrigins   []string     // browser origins allowed to call the API ("*" for any)
+	RatePerMinute int          // per-client request limit; 0 disables
 
 	mu sync.Mutex // pgx connections are not safe for concurrent use
 }
@@ -42,10 +43,14 @@ type Server struct {
 // Handler returns the routed http.Handler.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	if len(s.CORSOrigins) > 0 {
-		return s.cors(s.routes(mux))
+	var h http.Handler = s.routes(mux)
+	if s.RatePerMinute > 0 {
+		h = newRateLimiter(s.RatePerMinute).middleware(h)
 	}
-	return s.routes(mux)
+	if len(s.CORSOrigins) > 0 {
+		h = s.cors(h)
+	}
+	return h
 }
 
 // cors answers preflight requests and stamps allowed origins on responses.

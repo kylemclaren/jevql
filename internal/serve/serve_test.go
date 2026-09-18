@@ -368,3 +368,26 @@ func TestCORS(t *testing.T) {
 		t.Errorf("unknown origin must not be allowed")
 	}
 }
+
+func TestRateLimit(t *testing.T) {
+	s := &Server{Version: "t", Model: "m", RatePerMinute: 3}
+	h := s.Handler()
+	codes := []int{}
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+		req.RemoteAddr = "10.0.0.1:1234"
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		codes = append(codes, rr.Code)
+	}
+	if codes[0] != 200 || codes[2] != 200 || codes[3] != 429 || codes[4] != 429 {
+		t.Errorf("codes = %v", codes)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+	req.RemoteAddr = "10.0.0.2:1234"
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Errorf("other client should be allowed, got %d", rr.Code)
+	}
+}

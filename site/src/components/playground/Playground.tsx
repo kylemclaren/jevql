@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { highlightSQL } from "./highlight"
 
 /* ─────────────────────────────────────────────────────────
  * PLAYGROUND
@@ -53,6 +54,8 @@ SELECT id, subject FROM tickets WHERE status = 'open' AND jev(tickets, 'mentions
 ]
 
 const DEFAULT_NODE = "https://jevql-node.fly.dev"
+// The demo node is open: read-only data, a 300-row cap per query and a rate limit.
+// Point the playground at your own node from the settings panel (with a token if it has one).
 
 function useLocal(key: string, initial: string) {
   const [v, setV] = useState(initial)
@@ -71,8 +74,10 @@ export default function Playground() {
   const [tables, setTables] = useState<Table[]>([])
   const [detail, setDetail] = useState<TableDetail | null>(null)
   const [health, setHealth] = useState<string>("")
+  const [settings, setSettings] = useState(false)
   const abort = useRef<AbortController | null>(null)
   const ta = useRef<HTMLTextAreaElement>(null)
+  const hl = useRef<HTMLPreElement>(null)
 
   const headers = useMemo(() => ({ "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }), [token])
   const base = node.replace(/\/+$/, "")
@@ -87,7 +92,6 @@ export default function Playground() {
   }
 
   useEffect(() => {
-    if (!token) { setHealth(""); return }
     let dead = false
     call<{ ok: boolean; version: string; model: string }>("/v1/health").then((h) => !dead && setHealth(`connected · ${h.version} · ${h.model}`)).catch((e) => !dead && setHealth("cannot reach node: " + e.message))
     call<Table[]>("/v1/schema/tables").then((t) => !dead && setTables(t)).catch(() => {})
@@ -114,7 +118,10 @@ export default function Playground() {
 
   function onKey(e: React.KeyboardEvent) {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); run(e.shiftKey ? "explain" : "run") }
+    if (e.key === "Tab") { e.preventDefault(); document.execCommand("insertText", false, "  ") }
   }
+  const syncScroll = () => { if (hl.current && ta.current) { hl.current.scrollTop = ta.current.scrollTop; hl.current.scrollLeft = ta.current.scrollLeft } }
+  const connected = health.startsWith("connected")
 
   const fmt = (v: unknown) => v === null ? <i className="null">null</i> : typeof v === "object" ? JSON.stringify(v) : String(v)
 
@@ -123,9 +130,10 @@ export default function Playground() {
       <aside className="pg-side">
         <section className="pg-conn">
           <p className="eyebrow">node</p>
-          <input value={node} onChange={(e) => setNode(e.target.value)} aria-label="Node URL" spellCheck={false} />
-          <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="bearer token" aria-label="Bearer token" type="password" />
-          <p className={"pg-health " + (health.startsWith("connected") ? "ok" : "")}>{token ? health || "…" : "paste the playground token to connect"}</p>
+          <button type="button" className={"pg-node " + (connected ? "ok" : "")} onClick={() => setSettings(true)} title="Change node">
+            <span className="pg-node-url">{base.replace(/^https?:\/\//, "")}</span>
+            <span className="pg-node-state">{connected ? "connected" : health ? "unreachable" : "…"}</span>
+          </button>
         </section>
         <section>
           <p className="eyebrow">tables</p>
@@ -133,7 +141,7 @@ export default function Playground() {
             {tables.map((t) => (
               <li key={t.schema + t.name}><button type="button" onClick={() => describe(t.name)} className={detail?.name.endsWith(t.name) ? "on" : ""}>{t.name}<small>{t.kind}</small></button></li>
             ))}
-            {tables.length === 0 && <li className="muted">{token ? "no tables yet" : "connect to list tables"}</li>}
+            {tables.length === 0 && <li className="muted">{connected ? "no tables" : "connect a node to list tables"}</li>}
           </ul>
           {detail && (
             <ul className="pg-cols">
@@ -151,11 +159,14 @@ export default function Playground() {
 
       <main className="pg-main">
         <div className="pg-editor">
-          <textarea ref={ta} value={sql} onChange={(e) => setSql(e.target.value)} onKeyDown={onKey} spellCheck={false} aria-label="SQL" rows={9} />
+          <div className="pg-code">
+            <pre ref={hl} className="pg-hl" aria-hidden="true" dangerouslySetInnerHTML={{ __html: highlightSQL(sql) }} />
+            <textarea ref={ta} value={sql} onChange={(e) => setSql(e.target.value)} onKeyDown={onKey} onScroll={syncScroll} spellCheck={false} aria-label="SQL" rows={9} />
+          </div>
           <div className="pg-actions">
-            <button type="button" onClick={() => run("run")} disabled={!!busy || !token}>{busy === "run" ? "judging…" : "run"} <kbd>⌘↵</kbd></button>
-            <button type="button" className="secondary" onClick={() => run("explain")} disabled={!!busy || !token}>{busy === "explain" ? "planning…" : "explain"} <kbd>⇧⌘↵</kbd></button>
-            <span className="pg-hint">Read-only demo data. Every row that survives the SQL filters is judged; the node caps a query at 300 rows.</span>
+            <button type="button" onClick={() => run("run")} disabled={!!busy}>{busy === "run" ? "judging…" : "run"} <kbd>⌘↵</kbd></button>
+            <button type="button" className="secondary" onClick={() => run("explain")} disabled={!!busy}>{busy === "explain" ? "planning…" : "explain"} <kbd>⇧⌘↵</kbd></button>
+            <span className="pg-hint">Read-only demo data. Every row that survives the SQL filters is judged; this node caps a query at 300 rows.</span>
           </div>
         </div>
 
@@ -193,6 +204,19 @@ export default function Playground() {
           </div>
         )}
       </main>
+
+      <div className={"pg-drawer-backdrop " + (settings ? "open" : "")} onClick={() => setSettings(false)} aria-hidden={!settings} />
+      <aside className={"pg-drawer " + (settings ? "open" : "")} role="dialog" aria-label="Node settings" aria-hidden={!settings}>
+        <div className="pg-drawer-head">
+          <div><p className="eyebrow">settings</p><h2>Which node?</h2></div>
+          <button type="button" className="secondary small" onClick={() => setSettings(false)} aria-label="Close">✕</button>
+        </div>
+        <label>Node URL<input value={node} onChange={(e) => setNode(e.target.value)} spellCheck={false} placeholder={DEFAULT_NODE} /></label>
+        <label>Bearer token <small>only if your node has one</small><input value={token} onChange={(e) => setToken(e.target.value)} type="password" placeholder="leave empty for the demo node" /></label>
+        <p className={"pg-health " + (connected ? "ok" : "")}>{health || "…"}</p>
+        <p className="fine">The demo node at <code>{DEFAULT_NODE.replace(/^https?:\/\//, "")}</code> is open and read-only. Run your own with <code>jevql serve</code> (or <a href="/docs/deploy/">deploy a node</a>), start it with <code>--cors {typeof location !== "undefined" ? location.origin : "https://jevql.fly.dev"}</code>, and point this page at it.</p>
+        <button type="button" className="secondary" onClick={() => { setNode(DEFAULT_NODE); setToken("") }}>back to the demo node</button>
+      </aside>
     </div>
   )
 }
