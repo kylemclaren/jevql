@@ -10,7 +10,6 @@ const coins = [
   { name: "Claude", d: siClaude.path },
   { name: "OpenAI", d: openaiPath.trim() },
   { name: "Cursor", d: siCursor.path },
-  { name: "OpenCode", d: siOpencode.path },
 ]
 
 const goExample = `client, _ := jevql.New(ctx, jevql.Options{DatabaseURL: os.Getenv("DATABASE_URL")})
@@ -88,10 +87,10 @@ const install = "brew install kylemclaren/tap/jevql"
         <button class="copy prompt-pill" type="button" data-copy={agentPrompt} aria-label="Copy a prompt to give to your AI agent" title="Copies: Set me up with jevql: https://jevql.fly.dev/agent-ready.md">
           <span class="coins" aria-hidden="true">
             {coins.map((c, i) => (
-              <span class="coin" style={`z-index:${coins.length - i}`}><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d={c.d} /></svg></span>
+              <span class="coin" style={`z-index:${coins.length - i}; --i:${i}`}><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d={c.d} /></svg></span>
             ))}
           </span>
-          <span class="pill-text"><b>Feeling lazy?</b> Copy a prompt for your agent</span>
+          <span class="pill-text"><b>Hand it to your agent</b><small>copies a one-line setup prompt</small></span>
         </button>
       </div>
       <div class="truth-strip">
@@ -257,7 +256,7 @@ Linux amd64 · arm64</pre><span><a href={`${repo}/releases`} target="_blank" rel
       if (btn.classList.contains("prompt-pill")) {
         const t = btn.querySelector(".pill-text")!
         const original = t.innerHTML
-        t.innerHTML = ok ? "<b>Copied.</b> Paste it into your agent." : "Copy failed"
+        t.innerHTML = ok ? "<b>Copied</b><small>paste it into Claude, ChatGPT or Cursor</small>" : "<b>Copy failed</b><small>select the text at /agent-ready.md instead</small>"
         btn.classList.add("done")
         setTimeout(() => { t.innerHTML = original; btn.classList.remove("done") }, 1600)
         return
@@ -580,14 +579,21 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
 
   .install-actions { margin: 0 0 16px; }
   .install-actions button { padding: 14px 18px; font-size: .8rem; }
-  /* "copy a prompt for your agent" pill: a stack of tool marks + label, in the CTA row */
-  .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; background: #fff; text-transform: none; font-size: .74rem; font-weight: 600; text-align: left; }
-  .install-cta .prompt-pill:hover { background: var(--lime); }
-  .install-cta .prompt-pill.done { background: var(--lime); }
+  /* "hand it to your agent" pill: a stack of tool marks that jiggle on hover */
+  .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 14px; padding: 9px 22px 9px 9px; background: #fff; text-transform: none; text-align: left; box-shadow: 4px 4px 0 var(--ink); }
+  .install-cta .prompt-pill:hover, .install-cta .prompt-pill.done { background: var(--lime); }
   .prompt-pill .coins { display: inline-flex; }
-  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -8px; }
+  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -10px; box-shadow: 2px 2px 0 var(--ink); transition: transform 150ms; }
   .prompt-pill .coin:first-child { margin-left: 0; }
-  .prompt-pill .pill-text b { font-weight: 900; }
+  .prompt-pill:hover .coin { background: #fff; animation: jiggle 600ms ease-in-out calc(var(--i) * 90ms) 1; }
+  .prompt-pill:hover .coin:nth-child(1) { transform: translateY(-2px); }
+  .prompt-pill:hover .coin:nth-child(2) { transform: translateY(-4px); }
+  .prompt-pill:hover .coin:nth-child(3) { transform: translateY(-2px); }
+  @keyframes jiggle { 0% { rotate: 0deg; } 20% { rotate: -8deg; } 45% { rotate: 7deg; } 70% { rotate: -4deg; } 100% { rotate: 0deg; } }
+  .prompt-pill .pill-text { display: flex; flex-direction: column; gap: 3px; line-height: 1.1; }
+  .prompt-pill .pill-text b { font: 900 .92rem/1 ui-monospace, monospace; }
+  .prompt-pill .pill-text small { font: 600 .64rem/1 ui-monospace, monospace; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  @media (prefers-reduced-motion: reduce) { .prompt-pill:hover .coin { animation: none; transform: none; } }
   .mcp .doc-tabs { margin: 0 0 16px; }
   .tab-icon { margin-right: 6px; vertical-align: -2px; }
   .mcp .doc-tab { display: inline-flex; align-items: center; }
