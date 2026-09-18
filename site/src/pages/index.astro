@@ -85,19 +85,13 @@ const install = "brew install kylemclaren/tap/jevql"
         in a query: Postgres runs the SQL, Jev judges the rows, you get a psql table. Works on any Postgres you can already connect to, no extension required.
       </p>
       <div class="install-cta">
-        <button id="download" class="secondary" type="button">
-          <span class="material-symbols-rounded" aria-hidden="true">download</span> <span id="dl-label">download jevql</span>
-        </button>
-        <button class="secondary copy" type="button" data-copy={install}>
-          <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
-        </button>
         <button class="copy prompt-pill" type="button" data-copy={agentPrompt} aria-label="Copy a prompt to give to your AI agent" title="Copies: Set me up with jevql: https://jevql.fly.dev/agent-ready.md">
           <span class="coins" aria-hidden="true">
             {coins.map((c, i) => (
-              <span class="coin" style={`z-index:${coins.length - i}`}><svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d={c.d} /></svg></span>
+              <span class="coin" style={`z-index:${coins.length - i}`}><svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d={c.d} /></svg></span>
             ))}
           </span>
-          <span class="pill-text">Copy a prompt for <b>your agent</b></span>
+          <span class="pill-text"><b>Feeling lazy?</b> Copy a prompt for your agent</span>
         </button>
       </div>
       <div class="truth-strip">
@@ -157,6 +151,28 @@ const install = "brew install kylemclaren/tap/jevql"
       <div class="meter ex-meter" aria-hidden="true"><i id="ex-progress"></i></div>
     </section>
 
+    <section class="machine" aria-labelledby="install-title">
+      <div class="section-head">
+        <div><p class="eyebrow">install</p><h2 id="install-title">One binary, then just type <code>jevql</code></h2></div>
+        <a class="repo-link" href={`${repo}/releases`} target="_blank" rel="noopener">releases ↗</a>
+      </div>
+      <div class="install-cta install-actions">
+        <button id="download" class="secondary" type="button">
+          <span class="material-symbols-rounded" aria-hidden="true">download</span> <span id="dl-label">download jevql</span>
+        </button>
+        <button class="secondary copy" type="button" data-copy={install}>
+          <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
+        </button>
+      </div>
+      <div class="phases" aria-label="Install options">
+        <div class="phase"><small>shell</small><pre class="output" id="curl-line-2">curl -fsSL …/install.sh | sh</pre></div>
+        <div class="phase"><small>binaries</small><pre class="output">macOS arm64 · x86_64
+Linux amd64 · arm64</pre><span><a href={`${repo}/releases`} target="_blank" rel="noopener">github releases ↗</a></span></div>
+        <div class="phase"><small>go</small><pre class="output">go install github.com/kylemclaren/jevql/cmd/jevql@latest</pre><span>needs CGO for the Postgres parser</span></div>
+      </div>
+      <p class="fine">First launch asks for a database URL and a TypeSafe key and saves them to <code>~/.config/jevql/env</code>. Or use <code>DATABASE_URL</code>, <code>PG*</code> and <code>TYPESAFE_API_KEY</code> like any psql user.</p>
+    </section>
+
     <section class="method-map" aria-label="How a query runs">
       <div><small>1 / collect</small><strong>Postgres runs your SQL with the jev terms stripped. Indexed filters stay on the server.</strong></div>
       <div class="arrow" aria-hidden="true">→</div>
@@ -214,18 +230,6 @@ const install = "brew install kylemclaren/tap/jevql"
       </div>
     </section>
 
-    <section class="machine" aria-labelledby="install-title">
-      <div class="section-head">
-        <div><p class="eyebrow">install</p><h2 id="install-title">One binary, then just type <code>jevql</code></h2></div>
-        <a class="repo-link" href={`${repo}/releases`} target="_blank" rel="noopener">releases ↗</a>
-      </div>
-      <div class="phases" aria-label="Install options">
-        <div class="phase"><small>shell</small><pre class="output" id="curl-line-2">curl -fsSL …/install.sh | sh</pre></div>
-        <div class="phase"><small>homebrew</small><pre class="output">brew install kylemclaren/tap/jevql</pre></div>
-        <div class="phase"><small>go</small><pre class="output">go install github.com/kylemclaren/jevql/cmd/jevql@latest</pre><span>needs CGO for the Postgres parser</span></div>
-      </div>
-      <p class="fine">First launch asks for a database URL and a TypeSafe key and saves them to <code>~/.config/jevql/env</code>. Or use <code>DATABASE_URL</code>, <code>PG*</code> and <code>TYPESAFE_API_KEY</code> like any psql user.</p>
-    </section>
 
     <details>
       <summary>Read before pointing it at real data</summary>
@@ -574,12 +578,14 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .phase .copy-wrap { margin-top: 8px; }
   .phase .copy-wrap > pre { margin: 0; }
 
+  .install-actions { margin: 0 0 16px; }
+  .install-actions button { padding: 14px 18px; font-size: .8rem; }
   /* "copy a prompt for your agent" pill: a stack of tool marks + label, in the CTA row */
   .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; background: #fff; text-transform: none; font-size: .74rem; font-weight: 600; text-align: left; }
   .install-cta .prompt-pill:hover { background: var(--lime); }
   .install-cta .prompt-pill.done { background: var(--lime); }
   .prompt-pill .coins { display: inline-flex; }
-  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -8px; }
+  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -8px; }
   .prompt-pill .coin:first-child { margin-left: 0; }
   .prompt-pill .pill-text b { font-weight: 900; }
   .mcp .doc-tabs { margin: 0 0 16px; }
