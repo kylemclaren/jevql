@@ -113,9 +113,14 @@ export function SemanticSearch({ table = "tickets" }: { table?: string }) {
         body: JSON.stringify({ table, condition }),
         signal: ctl.signal,
       })
-      const body = await r.json()
-      if (!r.ok) throw new Error(body.error ?? r.statusText)
-      setResult(body)
+      if (!r.ok) {
+        // API errors are JSON ({ error }), but a crashed server may send HTML.
+        const text = await r.text()
+        let message = r.statusText
+        try { message = JSON.parse(text).error ?? message } catch {}
+        throw new Error(message)
+      }
+      setResult(await r.json())
     } catch (err) {
       if ((err as Error).name !== "AbortError") setError((err as Error).message)
     } finally {
@@ -211,7 +216,7 @@ The component ships without styles so it drops into whatever you have. If you wa
 
 ```ts
 import express from "express"
-import { Jevql } from "jevql"
+import { Jevql, JevqlError } from "jevql"
 
 const app = express()
 const db = new Jevql()
@@ -220,16 +225,23 @@ app.use(express.json())
 app.post("/api/search", async (req, res) => {
   const q = String(req.body.condition ?? "").replace(/'/g, "''")
   if (q.length < 3) return res.status(400).json({ error: "condition too short" })
-  // Same column list in both calls, so each row is judged once.
-  const out = await db.query(
-    `SELECT id, subject, jev_prob((t.subject, t.body), '${q}') AS relevance
-     FROM tickets t
-     WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
-       AND jev((t.subject, t.body), '${q}')
-     ORDER BY relevance DESC LIMIT 20`,
-    { maxRows: 500 },
-  )
-  res.json({ columns: out.columns, rows: out.rows, stats: out.stats })
+  try {
+    // Same column list in both calls, so each row is judged once.
+    const out = await db.query(
+      `SELECT id, subject, jev_prob((t.subject, t.body), '${q}') AS relevance
+       FROM tickets t
+       WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
+         AND jev((t.subject, t.body), '${q}')
+       ORDER BY relevance DESC LIMIT 20`,
+      { maxRows: 500 },
+    )
+    res.json({ columns: out.columns, rows: out.rows, stats: out.stats })
+  } catch (e) {
+    // Always answer with JSON: budget guards are the user's problem, everything else is ours.
+    if (e instanceof JevqlError && e.code === "budget") return res.status(422).json({ error: "Too many matching rows to search. Add a filter." })
+    console.error(e)
+    res.status(502).json({ error: "Search is unavailable right now. Try again." })
+  }
 })
 
 app.listen(3000)
