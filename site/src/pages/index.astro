@@ -25,9 +25,6 @@ const install = "brew install kylemclaren/tap/jevql"
         Put <code>jev(people, 'could work from home')</code> in a WHERE clause. Postgres runs the SQL,
         Jev judges the rows, you get a psql table. No extension to install: the server only sees plain SQL.
       </p>
-      <div class="truth-strip">
-        <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
-      </div>
       <div class="install-cta">
         <button id="download" type="button">
           <span class="material-symbols-rounded" aria-hidden="true">download</span> download jevql
@@ -35,6 +32,9 @@ const install = "brew install kylemclaren/tap/jevql"
         <button class="secondary copy" type="button" data-copy={install}>
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
+      </div>
+      <div class="truth-strip">
+        <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
       </div>
     </section>
 
@@ -380,8 +380,11 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
 <style is:global>
   code { font: inherit; font-family: ui-monospace, monospace; font-weight: 800; }
   .lede code { font-size: .9em; }
-  .install-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
-  .install-cta button { text-transform: none; }
+  .install-cta { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 26px; }
+  .install-cta button { text-transform: none; padding: 18px 24px; font-size: .92rem; box-shadow: 4px 4px 0 var(--ink); }
+  .install-cta button .material-symbols-rounded { font-size: 1.3rem; }
+  .install-cta button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+  @media (max-width: 750px) { .install-cta { flex-direction: column; } .install-cta button { width: 100%; } }
   button.secondary { background: #fff; }
   button.secondary:hover:not(:disabled) { background: var(--lime); }
   button.small { padding: 8px 9px; box-shadow: 2px 2px 0 var(--ink); }
