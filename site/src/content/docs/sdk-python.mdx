@@ -1,6 +1,6 @@
 ---
 title: Python SDK
-description: A zero-dependency client for Python 3.9+ over jevql serve or the CLI.
+description: A self-contained client for Python 3.9+. The engine ships inside the wheel.
 section: Integrate
 order: 23
 ---
@@ -9,37 +9,43 @@ order: 23
 pip install jevql
 ```
 
-Standard library only: `urllib` for HTTP and `subprocess` for the CLI. Install the binary first ([Install](/docs/install/)).
+That is the whole install. The wheel for your platform carries the jevql engine; the package itself is standard library only.
 
-## HTTP transport
+## Embedded engine
 
 ```python
 from jevql import Jevql, JevqlError
 
-db = Jevql(url="http://127.0.0.1:7433", token="secret")
+with Jevql() as db:      # starts a private engine on localhost on first use
+    res = db.query(
+        "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
+        threshold=0.6,
+    )
+    res.columns        # ["name", "p"]
+    res.rows           # [["Miguel Costa", 0.94], ...]
+    res.stats.usd      # 0.00005
 
-res = db.query(
-    "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
-    threshold=0.6,
-)
-res.columns        # ["name", "p"]
-res.rows           # [["Miguel Costa", 0.94], ...]
-res.stats.usd      # 0.00005
-
-for row in db.query_dicts("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')"):
-    print(row["subject"])
-
-plan = db.explain("SELECT * FROM people WHERE jev(people, 'x')")
+    for row in db.query_dicts("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')"):
+        print(row["subject"])
 ```
 
-Start the server with `jevql serve --listen 127.0.0.1:7433 --token secret`.
-
-## CLI transport
+Leaving the `with` block, calling `close()`, or exiting the interpreter stops the engine. It reads `DATABASE_URL`, `PG*`, `TYPESAFE_API_KEY`, `TYPESAFE_API_URL` and `JEV_THRESHOLD` from the environment, like the CLI. Override with keyword arguments:
 
 ```python
-db = Jevql.cli(binary="jevql", database_url=os.environ["DATABASE_URL"], api_key=os.environ["TYPESAFE_API_KEY"])
-rows = db.query_dicts("SELECT 1 AS one")
+Jevql(database_url="postgres://...", api_key="tsk_...", model="jev-latest", threshold=0.5, max_rows=2500, cache_path="~/.cache/jevql/cache.db")
 ```
+
+## Remote engine
+
+```python
+db = Jevql(url="https://jev.internal", token=os.environ["JEVQL_TOKEN"])
+```
+
+Run the shared engine with `jevql serve --listen 0.0.0.0:7433 --token secret` behind your own TLS proxy.
+
+## Engine discovery
+
+`engine_path=`, then `JEVQL_ENGINE_PATH`, then the binary bundled in the wheel, then `jevql` on `PATH`. If none exists, `JevqlError` with code `transport` tells you how to install one.
 
 ## Errors
 
@@ -54,4 +60,4 @@ except JevqlError as e:
 
 ## Types
 
-`QueryResult`, `Stats` and `Explain` are dataclasses with `from_dict`. `QueryResult.dicts()` zips columns and rows. `Jevql` works as a context manager.
+`QueryResult`, `Stats` and `Explain` are dataclasses with `from_dict`. `QueryResult.dicts()` zips columns and rows.

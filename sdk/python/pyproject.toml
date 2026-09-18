@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jevql"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python client for jevql: semantic SQL (jev()) on vanilla Postgres"
 readme = "README.md"
 license = "MIT"
@@ -24,6 +24,10 @@ Repository = "https://github.com/kylemclaren/jevql"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jevql"]
+artifacts = ["src/jevql/_engine/*"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["src/jevql/_engine/jevql", "src/jevql/_engine/jevql.exe"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

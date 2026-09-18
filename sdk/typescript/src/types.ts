@@ -25,7 +25,7 @@ export interface Explain {
   question_list: string[]
 }
 
-/** One statement's result. Both transports return this exact shape. */
+/** One statement's result. */
 export interface QueryResult {
   columns: string[]
   rows: unknown[][]
@@ -52,8 +52,8 @@ export interface QueryOptions {
   maxRows?: number
 }
 
-/** Talk to a running `jevql serve` over HTTP. */
-export interface HttpOptions {
+/** Talk to a running `jevql serve` somewhere (remote mode). */
+export interface RemoteOptions {
   /** Base URL of `jevql serve`, e.g. http://127.0.0.1:7433 */
   url: string
   /** Bearer token if the server was started with --token. */
@@ -62,24 +62,39 @@ export interface HttpOptions {
   fetch?: (input: string, init?: RequestInit) => Promise<Response>
 }
 
-/** Spawn the jevql binary per call. */
-export interface CliOptions {
-  cli: {
-    /** Path or name of the binary. Default "jevql". */
-    binary?: string
-    /** Passed as the positional connection URL; otherwise DATABASE_URL / PG* env apply. */
-    databaseUrl?: string
-    /** Passed as --api-key; otherwise TYPESAFE_API_KEY from the environment applies. */
-    apiKey?: string
-    /** Passed as TYPESAFE_API_URL in the child environment. */
-    apiUrl?: string
-    /** Extra environment for the child (merged over process.env). */
-    env?: Record<string, string>
-    cwd?: string
-  }
+/** Run a private engine in this process's lifetime (embedded mode, the default). */
+export interface EmbeddedOptions {
+  url?: undefined
+  /** Postgres connection URL. Otherwise DATABASE_URL / PG* from the environment apply. */
+  databaseUrl?: string
+  /** TypeSafe API key. Otherwise TYPESAFE_API_KEY applies. */
+  apiKey?: string
+  /** TypeSafe endpoint override. Otherwise TYPESAFE_API_URL applies. */
+  apiUrl?: string
+  /** Model name, default jev-latest. */
+  model?: string
+  /** Default jev() threshold. */
+  threshold?: number
+  /** Engine-wide --max-rows guard. */
+  maxRows?: number
+  /** Answer cache path; default ~/.cache/jevql/cache.db. */
+  cachePath?: string
+  /** Disable the answer cache. */
+  noCache?: boolean
+  /** Path to the jevql binary. Otherwise JEVQL_ENGINE_PATH, the bundled platform package, then PATH. */
+  enginePath?: string
+  /** Extra environment for the engine (merged over process.env). */
+  env?: Record<string, string>
+  /** Seconds to wait for the engine to report ready. Default 15. */
+  startTimeout?: number
+  /** Custom fetch (tests, polyfills). */
+  fetch?: (input: string, init?: RequestInit) => Promise<Response>
 }
 
-export type JevqlOptions = HttpOptions | CliOptions
+/** @deprecated use RemoteOptions */
+export type HttpOptions = RemoteOptions
+
+export type JevqlOptions = RemoteOptions | EmbeddedOptions
 
 export interface Health {
   ok: boolean

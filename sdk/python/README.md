@@ -1,88 +1,106 @@
-# jevql for Python
+# jevql (Python SDK)
 
-Python client for [jevql](https://github.com/kylemclaren/jevql), the psql-shaped
-CLI that evaluates `jev()` on vanilla Postgres. Zero dependencies, Python 3.9+.
+Semantic SQL on vanilla Postgres. Write `WHERE jev(people, 'could work from home')`;
+the jevql engine runs the SQL on Postgres, judges the rows with TypeSafe's Jev
+model, and hands back a table. Nothing to install on the database server.
 
 ```bash
 pip install jevql
 ```
 
-The SDK does not reimplement the SQL parser or the two-pass planner. It drives
-the `jevql` binary, so install that first:
+That is the whole install. The wheel for your platform (macOS arm64 and x86_64,
+Linux x86_64 and aarch64) bundles the jevql engine binary. No runtime
+dependencies, Python 3.9+.
 
-```bash
-brew install kylemclaren/tap/jevql      # or the release tarballs / go install
-```
+## Embedded engine (default)
 
-## Two transports, one result shape
-
-**HTTP** — point it at a running `jevql serve` (one warm process, one cache):
+`Jevql()` starts a private engine the first time you query and stops it when
+you `close()` (or on interpreter exit). Connection and API settings come from
+the same environment variables the CLI uses: `DATABASE_URL` or `PG*`,
+`TYPESAFE_API_KEY`, `TYPESAFE_API_URL`, `JEV_THRESHOLD`.
 
 ```python
+import os
 from jevql import Jevql
 
-with Jevql(url="http://127.0.0.1:7433", token=None) as db:
-    res = db.query("SELECT name, jev_prob(people, 'could work from home') AS p "
-                   "FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5")
-    print(res.columns)        # ['name', 'p']
-    for name, p in res.rows:  # rows are lists of JSON values
-        print(name, p)
-    print(res.stats.usd, res.stats.cache_hits)
+with Jevql() as db:
+    res = db.query(
+        "SELECT name, jev_prob(people, 'could work from home') AS p "
+        "FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
+        threshold=0.6,
+    )
+    res.columns        # ["name", "p"]
+    res.rows           # [["Miguel Costa", 0.94], ...]
+    res.stats.usd      # cost of that statement
+
+    for row in db.query_dicts("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')"):
+        print(row["subject"])
+
+    plan = db.explain("SELECT * FROM people WHERE jev(people, 'x')")   # no TypeSafe calls
 ```
 
-**CLI** — spawn `jevql --json-table` per call (fine for scripts and notebooks):
+Pass settings explicitly instead of through the environment:
 
 ```python
-db = Jevql.cli(database_url="postgres://user:pass@localhost:5432/app",
-               api_key="tsk_...")          # or rely on DATABASE_URL / TYPESAFE_API_KEY
-rows = db.query_dicts("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')")
+db = Jevql(
+    database_url=os.environ["DATABASE_URL"],
+    api_key=os.environ["TYPESAFE_API_KEY"],
+    model="jev-latest",      # optional
+    threshold=0.5,           # default jev() threshold
+    max_rows=2500,           # abort before any API call if the collect is bigger
+    cache_path="~/.cache/jevql/cache.db",  # or no_cache=True
+)
 ```
 
-Both return a `QueryResult`:
+The engine listens on a random loopback port with a random bearer token, and
+exits by itself if your process dies.
 
-| field       | type            | notes                                        |
-|-------------|-----------------|----------------------------------------------|
-| `columns`   | `list[str]`     | output column names, in order                |
-| `rows`      | `list[list]`    | JSON-typed values; timestamps are RFC 3339   |
-| `row_count` | `int`           |                                              |
-| `tag`       | `str`           | command tag, e.g. `SELECT 5` or `INSERT 0 1` |
-| `jev`       | `bool`          | whether the statement used `jev_*`           |
-| `stats`     | `Stats | None`  | judged, requests, cache_hits, tokens, usd, elapsed_ms |
-| `explain`   | `Explain | None`| set by `explain()`                           |
+## Remote server
 
-`res.dicts()` / `query_dicts()` give `list[dict]` keyed by column.
-
-## Explain before you spend
+For a shared engine (one warm cache, the API key held server-side), run
+`jevql serve --listen 0.0.0.0:7433 --token secret` somewhere and point the
+client at it:
 
 ```python
-ex = db.explain("SELECT * FROM people WHERE jev(people, 'could work from home')")
-print(ex.collect_sql, ex.rows, ex.tokens, ex.usd)   # no TypeSafe calls are made
+db = Jevql(url="http://jevql.internal:7433", token="secret")
 ```
-
-`query(sql, threshold=0.7, max_rows=500)` overrides the default `jev()`
-threshold and the row guard for one call.
 
 ## Errors
 
-Everything raises `jevql.JevqlError` with `.code` and `.status`:
+```python
+from jevql import JevqlError
 
-| code        | meaning                                              |
-|-------------|------------------------------------------------------|
-| `sql`       | Postgres or jevql rejected the statement (HTTP 400 / exit 1) |
-| `budget`    | `--max-rows` / `--max-chars` guard tripped (HTTP 402) |
-| `api`       | TypeSafe API failure (HTTP 502 / exit 2)             |
-| `auth`      | bad or missing bearer token (HTTP 401)               |
-| `internal`  | unexpected server error (HTTP 500)                   |
-| `transport` | could not reach `jevql serve` or run the binary      |
-
-## Running the tests
-
-```bash
-cd sdk/python
-pip install pytest
-python -m pytest                       # mocks only
-JEVQL_SERVE_URL=http://127.0.0.1:7433 python -m pytest   # plus live tests
+try:
+    db.query("SELECT * FROM nope")
+except JevqlError as e:
+    print(e.code, e.status, e)   # "sql", 400, 'relation "nope" does not exist'
 ```
 
-Row contents are sent to TypeSafe by the binary; the same data-handling notes
-as the CLI apply.
+`code` is one of `sql`, `budget` (a cost guard fired before any API call),
+`api` (TypeSafe error), `auth`, `internal`, or `transport` (engine or network
+problem).
+
+## Engine discovery
+
+`Jevql()` looks for the engine binary in this order:
+
+1. `Jevql(engine_path="/path/to/jevql")`
+2. the `JEVQL_ENGINE_PATH` environment variable
+3. the binary bundled in this package (`jevql/_engine/jevql`)
+4. a `jevql` on `PATH` (for example from `brew install kylemclaren/tap/jevql`)
+
+A source checkout has no bundled binary; use 2 or 4.
+
+## Types
+
+`QueryResult`, `Stats` and `Explain` are dataclasses with `from_dict`.
+`QueryResult.dicts()` zips columns and rows.
+
+## Building the platform wheels
+
+```bash
+python scripts/build_wheels.py --version 0.2.0 --tarballs dist/tarballs --out dist/wheels
+```
+
+reads `jevql_<version>_<os>_<arch>.tar.gz` release tarballs and produces one
+tagged wheel per platform. The release workflow does this automatically.

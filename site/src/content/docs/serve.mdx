@@ -5,7 +5,7 @@ section: Integrate
 order: 20
 ---
 
-`jevql serve` runs the same executor as the CLI behind a tiny JSON API on localhost. The TypeScript and Python SDKs use it for long-running processes: one connection, one warm cache.
+`jevql serve` runs the same executor as the CLI behind a tiny JSON API. It is what the TypeScript and Python SDKs talk to. By default they start a private one themselves; run it by hand when you want one shared engine, one connection and one warm cache for a whole team.
 
 ```bash
 jevql serve --listen 127.0.0.1:7433 --token secret
@@ -61,6 +61,10 @@ Only `sql` is required. `threshold` and `max_rows` override the server defaults 
 | 402 | `budget` | `--max-rows` or `--max-chars` fired; nothing was sent to TypeSafe |
 | 502 | `api` | TypeSafe returned an error |
 | 401 | `auth` | bad or missing bearer token |
+
+## How the SDKs embed it
+
+An SDK starts `jevql serve --listen 127.0.0.1:0 --token <random> --ready-json --parent-pid <its pid>`. The engine picks a free loopback port, prints one JSON line with the address, and exits by itself if the host process disappears. The SDK finds the binary via `JEVQL_ENGINE_PATH`, its bundled platform package, or `PATH`. Full contract in `sdk/PROTOCOL.md`.
 
 ## The same documents from the CLI
 

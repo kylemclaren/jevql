@@ -87,6 +87,7 @@ def test_connection_refused():
     assert ei.value.code == "transport"
 
 
-def test_requires_url_or_transport():
-    with pytest.raises(ValueError):
-        Jevql()
+def test_no_url_means_embedded():
+    db = Jevql()
+    assert db.embedded and db.transport.engine.process is None  # nothing spawned until first use
+    db.close()

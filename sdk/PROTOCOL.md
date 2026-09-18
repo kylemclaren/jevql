@@ -68,3 +68,30 @@ for API/budget errors. With `--explain`, the document carries `explain`.
 Value encoding follows the CLI's canonical JSON: timestamps are RFC 3339
 strings in UTC, `numeric` is a JSON number, `bytea` is base64, arrays and
 json/jsonb columns are nested JSON.
+
+## Embedded engine (how the SDKs start `jevql serve` themselves)
+
+The TypeScript and Python packages bundle the jevql binary for the current
+platform and run it as a private engine. The contract:
+
+```
+jevql serve --listen 127.0.0.1:0 --token <random> --ready-json --parent-pid <host pid> [--api-key K] [--api-url U] [--model M] [--threshold T] [--max-rows N] [--cache P | --no-cache] [postgres://...]
+```
+
+- `--listen 127.0.0.1:0` binds a free port on loopback.
+- `--ready-json` prints exactly one JSON line to stdout once listening:
+  `{"ready": true, "listen": "127.0.0.1:41661", "url": "http://127.0.0.1:41661", "version": "0.2.0", "pid": 55851}`.
+  Nothing else is written to stdout. Diagnostics go to stderr.
+- `--parent-pid` makes the engine exit within about two seconds of that
+  process disappearing, so a crashed host never leaves an orphan.
+- The SDK generates the token, passes it with `--token`, and sends it as a
+  bearer token on every request. Environment variables (`DATABASE_URL`,
+  `PG*`, `TYPESAFE_API_KEY`, `TYPESAFE_API_URL`, `JEV_THRESHOLD`) are inherited
+  by the engine, so the SDK only passes flags for options given explicitly.
+- Stopping: send SIGTERM (or close stdin and wait); the engine shuts down
+  gracefully. The SDK should do this on `close()` and at host exit.
+
+Engine discovery order: an explicit `enginePath` option, then the
+`JEVQL_ENGINE_PATH` environment variable, then the bundled platform package,
+then a `jevql` binary on `PATH`. If none exists the SDK raises a `transport`
+error that names the install command.

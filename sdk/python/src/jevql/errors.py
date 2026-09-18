@@ -14,11 +14,6 @@ STATUS_TO_CODE = {
     502: "api",
 }
 
-EXIT_TO_CODE = {
-    1: "sql",
-    2: "api",
-}
-
 
 class JevqlError(Exception):
     """Raised for any error from jevql or the transport."""

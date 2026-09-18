@@ -1,6 +1,6 @@
 ---
 title: TypeScript SDK
-description: A zero-dependency client for Node and Bun over jevql serve or the CLI.
+description: A self-contained client for Node and Bun. The engine ships inside the package.
 section: Integrate
 order: 22
 ---
@@ -9,20 +9,14 @@ order: 22
 npm i jevql
 ```
 
-The package has no runtime dependencies and needs Node 18+ or Bun. It talks to the Go binary, so install that first ([Install](/docs/install/)).
+That is the whole install. The package has no runtime dependencies and pulls in a small platform package with the jevql engine for your OS and CPU (`@jevql/engine-darwin-arm64`, `-darwin-x64`, `-linux-x64`, `-linux-arm64`). Node 18+ or Bun.
 
-## HTTP transport
-
-Start a server once:
-
-```bash
-jevql serve --listen 127.0.0.1:7433 --token secret
-```
+## Embedded engine
 
 ```ts
 import { Jevql } from "jevql"
 
-const db = new Jevql({ url: "http://127.0.0.1:7433", token: "secret" })
+const db = new Jevql()   // starts a private engine on localhost on first use
 
 const res = await db.query(
   "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
@@ -33,23 +27,44 @@ res.rows     // [["Miguel Costa", 0.94], ...]
 res.stats    // { judged: 6, requests: 1, cache_hits: 0, usd: 0.00005, ... }
 
 const tickets = await db.queryObjects("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')")
-// [{ id: 1, subject: "Charged twice", ... }]
-
-const plan = await db.explain("SELECT * FROM people WHERE jev(people, 'x')")
+await db.close()         // stops the engine; it also stops when your process exits
 ```
 
-## CLI transport
-
-No server, one process per call. Fine for scripts and notebooks:
+The engine reads `DATABASE_URL`, `PG*`, `TYPESAFE_API_KEY`, `TYPESAFE_API_URL` and `JEV_THRESHOLD` from your environment, exactly like the CLI. Pass options to override:
 
 ```ts
-const db = new Jevql({ cli: { binary: "jevql", databaseUrl: process.env.DATABASE_URL, apiKey: process.env.TYPESAFE_API_KEY } })
-const rows = await db.queryObjects("SELECT 1 AS one")
+new Jevql({
+  databaseUrl: "postgres://...",
+  apiKey: process.env.TYPESAFE_API_KEY,
+  model: "jev-latest",
+  threshold: 0.5,
+  maxRows: 2500,
+  cachePath: "~/.cache/jevql/cache.db",   // or noCache: true
+  enginePath: "/opt/jevql/bin/jevql",     // rarely needed, see below
+})
 ```
+
+## Remote engine
+
+For a team, run one engine and share its cache:
+
+```bash
+jevql serve --listen 0.0.0.0:7433 --token secret    # behind your own TLS proxy
+```
+
+```ts
+const db = new Jevql({ url: "https://jev.internal", token: process.env.JEVQL_TOKEN })
+```
+
+Same methods, same result shapes.
+
+## Engine discovery
+
+The embedded mode finds the binary in this order: `enginePath`, the `JEVQL_ENGINE_PATH` environment variable, the bundled platform package, then `jevql` on your `PATH`. If none exists you get a `JevqlError` with code `transport` naming the install commands.
 
 ## Errors
 
-Every failure is a `JevqlError` with `code` (`sql`, `budget`, `api`, `auth`, `internal`, `transport`) and, for HTTP, `status`:
+Every failure is a `JevqlError` with `code` (`sql`, `budget`, `api`, `auth`, `internal`, `transport`) and, for HTTP responses, `status`:
 
 ```ts
 import { JevqlError } from "jevql"
@@ -62,4 +77,4 @@ try {
 
 ## Types
 
-`QueryResult`, `Stats`, `Explain`, `JevqlOptions` are exported. `rows` is `unknown[][]`; `queryObjects` returns `Record<string, unknown>[]`.
+`QueryResult`, `Stats`, `Explain` and `JevqlOptions` are exported. `rows` is `unknown[][]`; `queryObjects` returns `Record<string, unknown>[]`.

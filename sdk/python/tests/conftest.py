@@ -107,41 +107,70 @@ def server():
     s.stop()
 
 
-@pytest.fixture
-def fake_jevql(tmp_path):
-    """A fake jevql binary that records argv/env and replays canned behaviour.
+FAKE_ENGINE = r'''#!/usr/bin/env python3
+"""Fake jevql engine for tests: honours the embedded-engine contract."""
+import json, os, sys, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-    Control file: <tmp>/behaviour.json {"exit": int, "stdout": str, "stderr": str}
-    Recording:    <tmp>/argv.json, <tmp>/env.json
-    """
-    control = tmp_path / "behaviour.json"
-    control.write_text(json.dumps({"exit": 0, "stdout": json.dumps(SAMPLE) + "\n", "stderr": ""}))
-    script = tmp_path / "jevql"
-    script.write_text(
-        "#!/usr/bin/env python3\n"
-        "import json, os, sys\n"
-        f"d = {str(tmp_path)!r}\n"
-        "if sys.argv[1:] == ['--version']:\n"
-        "    print('jevql 0.1.0'); sys.exit(0)\n"
-        "json.dump(sys.argv[1:], open(os.path.join(d, 'argv.json'), 'w'))\n"
-        "json.dump({k: v for k, v in os.environ.items() if k in ('DATABASE_URL', 'TYPESAFE_API_KEY', 'TYPESAFE_API_URL', 'JEVQL_TEST')}, open(os.path.join(d, 'env.json'), 'w'))\n"
-        "b = json.load(open(os.path.join(d, 'behaviour.json')))\n"
-        "sys.stdout.write(b['stdout']); sys.stderr.write(b['stderr'])\n"
-        "sys.exit(b['exit'])\n"
-    )
-    script.chmod(0o755)
+args = sys.argv[1:]
+log = os.environ.get("FAKE_ENGINE_LOG")
+if log:
+    with open(log, "w") as f:
+        json.dump({"argv": args, "env_marker": os.environ.get("FAKE_ENGINE_MARK")}, f)
+mode = os.environ.get("FAKE_ENGINE_MODE", "ok")
+if mode == "never-ready":
+    sys.stderr.write("engine: still warming up\n"); sys.stderr.flush()
+    time.sleep(60); sys.exit(0)
+if mode == "crash":
+    sys.stderr.write("ERROR: connection to server failed: boom\n"); sys.stderr.flush()
+    sys.exit(3)
+if mode == "garbage":
+    print("not json at all"); sys.stdout.flush(); time.sleep(60); sys.exit(0)
+token = args[args.index("--token") + 1]
+
+class H(BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def _auth(self):
+        if self.headers.get("Authorization") != "Bearer " + token:
+            self._send(401, {"error": "missing or invalid bearer token", "code": "auth"}); return False
+        return True
+    def _send(self, status, body):
+        data = json.dumps(body).encode()
+        self.send_response(status); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+    def do_GET(self):
+        if not self._auth(): return
+        self._send(200, {"ok": True, "version": "fake", "model": "jev-test"})
+    def do_POST(self):
+        if not self._auth(): return
+        n = int(self.headers.get("Content-Length", 0)); req = json.loads(self.rfile.read(n) or b"{}")
+        if req.get("sql") == "SELECT * FROM nope":
+            self._send(400, {"error": "relation \"nope\" does not exist", "code": "sql"}); return
+        self._send(200, {"columns": ["sql", "threshold"], "rows": [[req.get("sql"), req.get("threshold")]],
+                         "row_count": 1, "tag": "SELECT 1", "jev": False, "stats": None, "explain": None})
+
+srv = HTTPServer(("127.0.0.1", 0), H)
+print(json.dumps({"ready": True, "listen": "127.0.0.1:%d" % srv.server_port,
+                  "url": "http://127.0.0.1:%d" % srv.server_port, "version": "fake", "pid": os.getpid()}))
+sys.stdout.flush()
+srv.serve_forever()
+'''
+
+
+@pytest.fixture
+def fake_engine(tmp_path, monkeypatch):
+    """A fake engine binary plus a way to read what it was started with."""
+    path = tmp_path / "fake-jevql"
+    path.write_text(FAKE_ENGINE)
+    path.chmod(0o755)
+    log = tmp_path / "engine.json"
+    monkeypatch.setenv("FAKE_ENGINE_LOG", str(log))
+    monkeypatch.delenv("JEVQL_ENGINE_PATH", raising=False)
 
     class Fake:
-        path = str(script)
-        dir = tmp_path
+        binary = str(path)
 
-        def set(self, exit=0, stdout="", stderr=""):
-            control.write_text(json.dumps({"exit": exit, "stdout": stdout, "stderr": stderr}))
-
-        def argv(self):
-            return json.loads((tmp_path / "argv.json").read_text())
-
-        def env(self):
-            return json.loads((tmp_path / "env.json").read_text())
+        def started_with(self):
+            return json.loads(log.read_text())
 
     return Fake()

@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import subprocess
 import urllib.error
 import urllib.request
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
-from .errors import EXIT_TO_CODE, STATUS_TO_CODE, JevqlError
+from .engine import Engine
+from .errors import STATUS_TO_CODE, JevqlError
 
 
 class Transport(ABC):
@@ -27,7 +25,6 @@ class Transport(ABC):
         """Return the raw QueryResult dict for one statement."""
 
     def health(self) -> Dict[str, Any]:
-        """Return a health document; transports without one report ok."""
         return {"ok": True}
 
     def close(self) -> None:  # pragma: no cover - default no-op
@@ -35,7 +32,7 @@ class Transport(ABC):
 
 
 class HttpTransport(Transport):
-    """Talks to a running ``jevql serve``."""
+    """Talks to a running jevql server (``jevql serve``) over HTTP."""
 
     def __init__(self, url: str, token: Optional[str] = None, timeout: float = 60.0):
         self.url = url.rstrip("/")
@@ -67,10 +64,10 @@ class HttpTransport(Transport):
                 status=status,
             ) from None
         except urllib.error.URLError as e:
-            raise JevqlError(f"cannot reach jevql serve at {self.url}: {e.reason}", code="transport") from None
+            raise JevqlError(f"cannot reach jevql server at {self.url}: {e.reason}", code="transport") from None
         payload = _decode(raw)
         if not isinstance(payload, dict):
-            raise JevqlError("malformed response from jevql serve", code="transport", status=status)
+            raise JevqlError("malformed response from jevql server", code="transport", status=status)
         return payload
 
     def run(self, sql, *, threshold=None, max_rows=None, explain=False):
@@ -87,91 +84,29 @@ class HttpTransport(Transport):
         return self._request("GET", "/v1/health")
 
 
-class CliTransport(Transport):
-    """Runs the ``jevql`` binary with ``--json-table`` for every call."""
+class EmbeddedTransport(Transport):
+    """Starts a private engine on first use and talks to it over HTTP."""
 
-    def __init__(
-        self,
-        binary: str = "jevql",
-        database_url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        api_url: Optional[str] = None,
-        env: Optional[Mapping[str, str]] = None,
-        cwd: Optional[str] = None,
-        timeout: Optional[float] = None,
-    ):
-        self.binary = binary
-        self.database_url = database_url
-        self.api_key = api_key
-        self.api_url = api_url
-        self.env = dict(env) if env else None
-        self.cwd = cwd
+    def __init__(self, engine: Engine, timeout: float = 60.0):
+        self.engine = engine
         self.timeout = timeout
+        self._http: Optional[HttpTransport] = None
 
-    def argv(self, sql: str, *, threshold=None, max_rows=None, explain=False) -> List[str]:
-        args = [self.binary, "--json-table"]
-        if threshold is not None:
-            args += ["--threshold", str(float(threshold))]
-        if max_rows is not None:
-            args += ["--max-rows", str(int(max_rows))]
-        if explain:
-            args.append("--explain")
-        if self.api_key:
-            args += ["--api-key", self.api_key]
-        if self.api_url:
-            args += ["--api-url", self.api_url]
-        args += ["-c", sql]
-        if self.database_url:
-            args.append(self.database_url)
-        return args
+    def _client(self) -> HttpTransport:
+        url = self.engine.start()
+        if self._http is None or self._http.url != url:
+            self._http = HttpTransport(url, token=self.engine.token, timeout=self.timeout)
+        return self._http
 
     def run(self, sql, *, threshold=None, max_rows=None, explain=False):
-        argv = self.argv(sql, threshold=threshold, max_rows=max_rows, explain=explain)
-        env = os.environ.copy()
-        if self.env:
-            env.update(self.env)
-        if shutil.which(self.binary) is None and not os.path.exists(self.binary):
-            raise JevqlError(
-                f"jevql binary not found ({self.binary!r}); install it with: brew install kylemclaren/tap/jevql",
-                code="transport",
-            )
-        try:
-            proc = subprocess.run(
-                argv,
-                capture_output=True,
-                text=True,
-                env=env,
-                cwd=self.cwd,
-                timeout=self.timeout,
-            )
-        except (OSError, subprocess.SubprocessError) as e:
-            raise JevqlError(f"failed to run {self.binary}: {e}", code="transport") from None
-        if proc.returncode != 0:
-            message = (proc.stderr or proc.stdout or "").strip() or f"jevql exited with status {proc.returncode}"
-            raise JevqlError(message, code=EXIT_TO_CODE.get(proc.returncode, "internal"), status=proc.returncode)
-        docs = [line for line in proc.stdout.splitlines() if line.strip()]
-        if not docs:
-            raise JevqlError("jevql produced no output", code="transport")
-        try:
-            payload = json.loads(docs[-1])
-        except ValueError:
-            raise JevqlError("malformed --json-table output from jevql", code="transport") from None
-        if not isinstance(payload, dict) or "columns" not in payload:
-            if isinstance(payload, dict) and payload.get("error"):
-                raise JevqlError(str(payload["error"]), code=str(payload.get("code", "internal")))
-            raise JevqlError("malformed --json-table output from jevql", code="transport")
-        return payload
+        return self._client().run(sql, threshold=threshold, max_rows=max_rows, explain=explain)
 
     def health(self) -> Dict[str, Any]:
-        path = shutil.which(self.binary) or (self.binary if os.path.exists(self.binary) else None)
-        if not path:
-            return {"ok": False, "error": f"{self.binary} not found"}
-        try:
-            proc = subprocess.run([self.binary, "--version"], capture_output=True, text=True, timeout=30)
-        except (OSError, subprocess.SubprocessError) as e:
-            return {"ok": False, "error": str(e)}
-        version = proc.stdout.strip().split()[-1] if proc.stdout.strip() else ""
-        return {"ok": proc.returncode == 0, "version": version, "binary": path}
+        return self._client().health()
+
+    def close(self) -> None:
+        self.engine.stop()
+        self._http = None
 
 
 def _decode(raw: bytes) -> Any:

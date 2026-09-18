@@ -215,15 +215,19 @@ for _, r := range rows {
 
 ### TypeScript (`npm i jevql`)
 
+The package bundles the jevql engine for your platform and starts a private
+one on localhost the first time you query. Nothing else to install.
+
 ```ts
 import { Jevql } from "jevql"
 
-const db = new Jevql({ url: "http://127.0.0.1:7433", token: process.env.JEVQL_TOKEN }) // jevql serve
-// or: new Jevql({ cli: { databaseUrl: process.env.DATABASE_URL } })            // spawns the binary
+const db = new Jevql()                      // embedded engine; reads DATABASE_URL, TYPESAFE_API_KEY
+// const db = new Jevql({ url: "http://127.0.0.1:7433", token: "..." })  // a shared jevql serve
 
 const tickets = await db.queryObjects(
   "SELECT id, subject FROM tickets WHERE jev(tickets, 'is about billing') AND status = 'open'",
 )
+await db.close()
 ```
 
 ### Python (`pip install jevql`)
@@ -231,17 +235,15 @@ const tickets = await db.queryObjects(
 ```python
 from jevql import Jevql
 
-db = Jevql(url="http://127.0.0.1:7433", token=os.environ["JEVQL_TOKEN"])   # jevql serve
-# or: Jevql.cli(database_url=os.environ["DATABASE_URL"])                    # spawns the binary
-
-for row in db.query_dicts("SELECT title FROM movies WHERE jev(movies, 'a safe pick for a first date')"):
-    print(row["title"])
+with Jevql() as db:                          # embedded engine; or Jevql(url=..., token=...)
+    for row in db.query_dicts("SELECT title FROM movies WHERE jev(movies, 'a safe pick for a first date')"):
+        print(row["title"])
 ```
 
-Start the server the TypeScript and Python HTTP transports use with:
+For a team, run one shared engine and point every client at it:
 
 ```bash
-jevql serve --listen 127.0.0.1:7433 --token secret
+jevql serve --listen 0.0.0.0:7433 --token secret     # behind your own TLS proxy
 ```
 
 ## Development

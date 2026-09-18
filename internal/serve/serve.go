@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -130,11 +131,19 @@ func (s *Server) run(ctx context.Context, req wire.QueryRequest) (*wire.QueryRes
 	return wire.FromResult(res), nil
 }
 
-// ListenAndServe runs until ctx is cancelled.
-func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
-	srv := &http.Server{Addr: addr, Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+// ListenAndServe runs until ctx is cancelled. addr may end in ":0" to pick
+// a free port; onReady (optional) receives the bound address before serving.
+func (s *Server) ListenAndServe(ctx context.Context, addr string, onReady func(bound string)) error {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	if onReady != nil {
+		onReady(ln.Addr().String())
+	}
+	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
+	go func() { errc <- srv.Serve(ln) }()
 	select {
 	case <-ctx.Done():
 		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -147,4 +156,29 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 		}
 		return err
 	}
+}
+
+// WatchParent cancels the returned context when the process pid disappears.
+// SDKs pass their own pid so an orphaned engine does not outlive them.
+func WatchParent(ctx context.Context, pid int) context.Context {
+	if pid <= 0 {
+		return ctx
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	go func() {
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if !processAlive(pid) {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx
 }

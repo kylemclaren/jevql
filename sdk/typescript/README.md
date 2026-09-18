@@ -1,109 +1,99 @@
 # jevql (TypeScript SDK)
 
-Client for [jevql](https://github.com/kylemclaren/jevql): semantic SQL on
-vanilla Postgres. Write `WHERE jev(people, 'could work from home')`; the
-jevql binary runs the SQL on Postgres, judges rows with TypeSafe's Jev model,
-and returns a table. The SDK has no runtime dependencies and needs Node 18+
-or Bun.
-
-The parsing and two-pass execution live in the Go binary, so install it
-first:
+Semantic SQL on vanilla Postgres from Node or Bun. Write
+`WHERE jev(people, 'could work from home')`; the jevql engine runs the SQL
+on Postgres, judges rows with TypeSafe's Jev model, and returns a table.
 
 ```bash
-brew install kylemclaren/tap/jevql     # or: curl -fsSL https://<site>/install.sh | sh
 npm i jevql
 ```
 
-## Two transports
+That is the whole install. The package bundles the jevql engine binary for
+your platform (macOS arm64/x64, Linux x64/arm64) as an optional dependency
+and runs it privately for the lifetime of your process. Zero runtime
+dependencies, Node 18+ or Bun.
 
-**HTTP** talks to a long-running `jevql serve` (one process, one warm cache):
+## Embedded (default)
 
 ```ts
 import { Jevql } from "jevql"
 
-const db = new Jevql({ url: "http://127.0.0.1:7433", token: process.env.JEVQL_TOKEN })
+const db = new Jevql() // DATABASE_URL and TYPESAFE_API_KEY from the environment
 
 const res = await db.query(
   "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
   { threshold: 0.6 },
 )
-res.columns   // ["name", "p"]
-res.rows      // [["Miguel Costa", 0.94], ...]
-res.stats     // { judged: 6, requests: 1, cache_hits: 0, input_tokens: 1200, usd: 0.00005, ... }
+res.columns // ["name", "p"]
+res.rows    // [["Miguel Costa", 0.94], ...]
+res.stats   // { judged: 6, requests: 1, cache_hits: 0, input_tokens: 1200, usd: 0.00005, ... }
 
 const rows = await db.queryObjects("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')")
 // [{ id: 1, subject: "Charged twice", ... }]
+
+const plan = await db.explain("SELECT * FROM people WHERE jev(people, 'x')") // no TypeSafe call
+
+await db.close() // stops the engine; also happens automatically at process exit
 ```
 
-Start the server with `jevql serve --listen 127.0.0.1:7433 [--token ...]`.
+`await using db = new Jevql()` disposes it at the end of the block.
 
-**CLI** spawns the binary per call. Good for scripts and notebooks; no server
-to manage:
+Explicit options, all optional (environment variables apply otherwise):
+
+| option | flag on the engine |
+|---|---|
+| `databaseUrl` | connection URL (else `DATABASE_URL` / `PG*`) |
+| `apiKey`, `apiUrl`, `model` | `--api-key`, `--api-url`, `--model` |
+| `threshold`, `maxRows` | `--threshold`, `--max-rows` |
+| `cachePath`, `noCache` | `--cache`, `--no-cache` |
+| `enginePath` | which binary to run |
+| `env` | extra environment for the engine |
+| `startTimeout` | seconds to wait for the engine (default 15) |
+
+The engine is started on the first call (or `await db.start()`), listens on
+a random loopback port with a random bearer token, and exits by itself if
+your process dies.
+
+## Remote
+
+Point the client at a `jevql serve` you run elsewhere (one shared cache, the
+TypeSafe key kept on the server):
 
 ```ts
-const db = new Jevql({
-  cli: {
-    databaseUrl: process.env.DATABASE_URL,   // optional; PG* env works too
-    apiKey: process.env.TYPESAFE_API_KEY,    // optional; env works too
-  },
-})
-const res = await db.query("SELECT 1")
+const db = new Jevql({ url: "http://127.0.0.1:7433", token: process.env.JEVQL_TOKEN })
 ```
 
-Both transports return the same `QueryResult`:
+Start that server with `jevql serve --listen 0.0.0.0:7433 --token secret`.
 
-```ts
-interface QueryResult {
-  columns: string[]
-  rows: unknown[][]
-  row_count: number
-  tag: string            // "SELECT 5", "INSERT 0 1"
-  jev: boolean           // true when jev_* calls were evaluated
-  stats: Stats | null    // tokens, cost, cache hits, elapsed
-  explain: Explain | null
-}
-```
+## Engine discovery
 
-## Explain before you pay
-
-```ts
-const plan = await db.explain("SELECT * FROM people WHERE jev(people, 'could work from home')")
-plan.collect_sql  // what Postgres actually runs
-plan.rows         // rows after SQL filters (all of them get judged)
-plan.usd          // rough cost, no TypeSafe call made
-```
+In order: `enginePath`, the `JEVQL_ENGINE_PATH` environment variable, the
+bundled `@jevql/engine-<os>-<arch>` package, then a `jevql` binary on
+`PATH`. If none is found the error names the install commands
+(`brew install kylemclaren/tap/jevql` or `npm i @jevql/engine-...`).
 
 ## Errors
 
-Every failure throws `JevqlError` with a `code`:
-
-| code        | meaning                                              |
-|-------------|------------------------------------------------------|
-| `sql`       | Postgres or jevql rejected the statement             |
-| `budget`    | `--max-rows` / `--max-chars` guard stopped it, no HTTP made |
-| `api`       | TypeSafe returned an error                            |
-| `auth`      | bad or missing server token                           |
-| `internal`  | server-side failure                                   |
-| `transport` | could not reach the server or run the binary          |
+Every failure is a `JevqlError` with `code` (`sql`, `budget`, `api`, `auth`,
+`internal`, `transport`) and, when it came from the engine, `status`:
 
 ```ts
 import { JevqlError } from "jevql"
 try {
-  await db.query("SELECT * FROM people WHERE jev(people, 'x') OR country = 'PT'")
+  await db.query("SELECT * FROM nope")
 } catch (e) {
-  if (e instanceof JevqlError && e.code === "sql") console.error(e.message) // OR jev(...) is not supported in v1 ...
+  if (e instanceof JevqlError && e.code === "sql") console.error(e.message)
 }
 ```
 
-`e.status` carries the HTTP status (HTTP transport) or the process exit code
-(CLI transport).
+## Types
 
-## Development
+`QueryResult`, `Stats`, `Explain`, `EmbeddedOptions`, `RemoteOptions` are
+exported. `rows` is `unknown[][]`; `queryObjects` returns
+`Record<string, unknown>[]`.
 
-```bash
-bun install
-bun run typecheck
-bun test                              # mocks only
-JEVQL_SERVE_URL=http://127.0.0.1:7433 bun test   # also hits a live server
-bun run build                         # emits dist/
-```
+## Publishing the platform packages
+
+`scripts/make-platform-packages.mjs --version X --tarballs DIR --out DIR`
+turns the GitHub release tarballs into the four `@jevql/engine-*` packages;
+the release workflow publishes them alongside this package.

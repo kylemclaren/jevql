@@ -13,19 +13,18 @@ rows, err := client.QueryMaps(ctx, \`
   ORDER BY p DESC LIMIT 5\`)`
 const tsExample = `import { Jevql } from "jevql"
 
-const db = new Jevql({ url: "http://127.0.0.1:7433" }) // jevql serve
+const db = new Jevql() // bundled engine, reads DATABASE_URL and TYPESAFE_API_KEY
 
 const tickets = await db.queryObjects(\`
   SELECT id, subject FROM tickets
   WHERE jev(tickets, 'is about billing') AND status = 'open'\`)`
 const pyExample = `from jevql import Jevql
 
-db = Jevql.cli(database_url=os.environ["DATABASE_URL"])  # spawns the binary
-
-for row in db.query_dicts("""
-    SELECT title FROM movies
-    WHERE jev(movies, 'a safe pick for a first date')"""):
-    print(row["title"])`
+with Jevql() as db:  # bundled engine; Jevql(url=...) for a shared one
+    for row in db.query_dicts("""
+        SELECT title FROM movies
+        WHERE jev(movies, 'a safe pick for a first date')"""):
+        print(row["title"])`
 
 const repo = "https://github.com/kylemclaren/jevql"
 const install = "brew install kylemclaren/tap/jevql"
@@ -145,8 +144,8 @@ const install = "brew install kylemclaren/tap/jevql"
       </div>
       <Tabs labels={["Go", "TypeScript", "Python"]} storageKey="landing-sdk">
         <div><Code code={goExample} lang="go" theme="github-light" /><p class="fine">In process: <code>go get github.com/kylemclaren/jevql/sdk/go</code>. Same parser, cache and client as the CLI.</p></div>
-        <div><Code code={tsExample} lang="ts" theme="github-light" /><p class="fine"><code>npm i jevql</code>. Zero dependencies. Talks to <code>jevql serve</code> or spawns the binary.</p></div>
-        <div><Code code={pyExample} lang="python" theme="github-light" /><p class="fine"><code>pip install jevql</code>. Standard library only. Same two transports.</p></div>
+        <div><Code code={tsExample} lang="ts" theme="github-light" /><p class="fine"><code>npm i jevql</code>. The engine ships inside the package; nothing else to install. Point it at a shared <code>jevql serve</code> with <code>{"{"} url {"}"}</code>.</p></div>
+        <div><Code code={pyExample} lang="python" theme="github-light" /><p class="fine"><code>pip install jevql</code>. Standard library only, engine included. Same embedded-or-remote choice.</p></div>
       </Tabs>
     </section>
 

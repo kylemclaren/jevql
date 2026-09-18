@@ -125,7 +125,9 @@ describe("http transport", () => {
 })
 
 describe("constructor", () => {
-  test("rejects empty options", () => {
-    expect(() => new Jevql({} as never)).toThrow(TypeError)
+  test("no url means embedded mode; url means remote", () => {
+    expect(new Jevql().embedded).toBe(true)
+    expect(new Jevql({}).embedded).toBe(true)
+    expect(new Jevql({ url: "http://127.0.0.1:1" }).embedded).toBe(false)
   })
 })

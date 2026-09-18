@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -163,5 +164,30 @@ func TestQueries(t *testing.T) {
 	code, _ = post(t, h, "", wire.QueryRequest{SQL: "CREATE TEMP TABLE t_serve (a int)"})
 	if code != 200 {
 		t.Errorf("ddl: %d", code)
+	}
+}
+
+func TestListenRandomPortReady(t *testing.T) {
+	s := &Server{Version: "test", Model: "m"}
+	ctx, cancel := context.WithCancel(context.Background())
+	ready := make(chan string, 1)
+	done := make(chan error, 1)
+	go func() { done <- s.ListenAndServe(ctx, "127.0.0.1:0", func(b string) { ready <- b }) }()
+	var addr string
+	select {
+	case addr = <-ready:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no ready callback")
+	}
+	if addr == "127.0.0.1:0" || addr == "" {
+		t.Fatalf("bound address = %q", addr)
+	}
+	res, err := http.Get("http://" + addr + "/v1/health")
+	if err != nil || res.StatusCode != 200 {
+		t.Fatalf("health: %v %v", err, res)
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }

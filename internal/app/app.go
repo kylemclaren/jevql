@@ -72,6 +72,8 @@ type Config struct {
 	Columns     string
 	JSONTable   bool
 	Serve       bool
+	ReadyJSON   bool
+	ParentPID   int
 	Listen      string
 	Token       string
 	ShowVersion bool
@@ -124,6 +126,8 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.BoolVar(&c.JSONTable, "json-table", false, "machine output: one JSON document per statement (see sdk/PROTOCOL.md)")
 	fs.StringVar(&c.Listen, "listen", envOr("JEVQL_LISTEN", "127.0.0.1:7433"), "address for `jevql serve`")
 	fs.StringVar(&c.Token, "token", os.Getenv("JEVQL_TOKEN"), "bearer token required by `jevql serve` (default $JEVQL_TOKEN)")
+	fs.BoolVar(&c.ReadyJSON, "ready-json", false, "serve: print a JSON line with the bound address on stdout once listening (for SDKs)")
+	fs.IntVar(&c.ParentPID, "parent-pid", 0, "serve: exit when this process id goes away (for SDKs that embed the engine)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, "jevql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
@@ -340,8 +344,15 @@ func (s *session) serve(ctx context.Context) int {
 	if s.cfg.Token != "" {
 		auth = "bearer token required"
 	}
-	s.ui.notef("jevql %s serving http://%s (%s, db %s); Ctrl-C to stop", version, s.cfg.Listen, auth, s.dbname)
-	if err := srv.ListenAndServe(ctx, s.cfg.Listen); err != nil {
+	ctx = serve.WatchParent(ctx, s.cfg.ParentPID)
+	onReady := func(bound string) {
+		s.ui.notef("jevql %s serving http://%s (%s, db %s); Ctrl-C to stop", version, bound, auth, s.dbname)
+		if s.cfg.ReadyJSON {
+			line, _ := json.Marshal(map[string]any{"ready": true, "listen": bound, "url": "http://" + bound, "version": version, "pid": os.Getpid()})
+			fmt.Fprintln(s.ui.out, string(line))
+		}
+	}
+	if err := srv.ListenAndServe(ctx, s.cfg.Listen, onReady); err != nil {
 		s.ui.errorf("%v", err)
 		return ExitSQL
 	}

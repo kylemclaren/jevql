@@ -3,13 +3,24 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022", "DOM"],
+    "lib": [
+      "ES2022",
+      "ESNext.Disposable",
+      "DOM"
+    ],
     "strict": true,
     "declaration": true,
     "outDir": "dist",
     "rootDir": ".",
     "skipLibCheck": true,
-    "types": ["node", "bun"]
+    "allowJs": true,
+    "types": [
+      "node",
+      "bun"
+    ]
   },
-  "include": ["src", "test"]
+  "include": [
+    "src",
+    "test"
+  ]
 }

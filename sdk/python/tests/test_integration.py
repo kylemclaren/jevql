@@ -1,4 +1,4 @@
-"""Runs against a real `jevql serve` when JEVQL_SERVE_URL is set."""
+"""Runs against a shared `jevql serve` when JEVQL_SERVE_URL is set (remote mode)."""
 
 import os
 

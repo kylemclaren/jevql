@@ -82,3 +82,57 @@ jobs:
           git add Formula/jevql.rb
           git commit -m "jevql ${VERSION}" || echo "formula unchanged"
           git push
+
+  packages:
+    name: SDK platform packages
+    needs: release
+    if: ${{ !contains(github.ref_name, '-') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: npm platform packages
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd sdk/typescript
+          bun install --frozen-lockfile
+          bun run build
+          node scripts/make-platform-packages.mjs --version "$VERSION" --tarballs ../../artifacts --out ../../dist-npm
+          npm version "$VERSION" --no-git-tag-version
+      - name: python wheels
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          pip install build wheel twine
+          cd sdk/python
+          python scripts/build_wheels.py --version "$VERSION" --tarballs ../../artifacts --out ../../dist-py
+      - name: attach wheels to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist-py/*.whl --clobber
+      - name: publish to npm
+        if: ${{ env.NODE_AUTH_TOKEN != '' }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for d in dist-npm/*/; do (cd "$d" && npm publish --access public); done
+          (cd sdk/typescript && npm publish --access public)
+      - name: publish to PyPI
+        if: ${{ env.TWINE_PASSWORD != '' }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: twine upload dist-py/*.whl

@@ -4,3 +4,7 @@ dist/
 build/
 *.egg-info/
 .venv/
+
+src/jevql/_engine/jevql
+src/jevql/_engine/jevql.exe
+build/

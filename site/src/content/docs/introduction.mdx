@@ -38,18 +38,20 @@ There is no extension, no `CREATE EXTENSION`, no proxy in front of Postgres. If 
 
 ## From your code
 
-The same engine is available as libraries. Go links it in process; TypeScript and Python talk to a local `jevql serve` or spawn the binary.
+The same engine is available as libraries. Go links it in process; the TypeScript and Python packages bundle the engine and start a private one on localhost, or point at a shared `jevql serve`.
 
 ```go
 rows, err := client.QueryMaps(ctx, "SELECT name FROM people WHERE jev(people, 'could work from home')")
 ```
 
 ```ts
+const db = new Jevql()
 const rows = await db.queryObjects("SELECT name FROM people WHERE jev(people, 'could work from home')")
 ```
 
 ```python
-rows = db.query_dicts("SELECT name FROM people WHERE jev(people, 'could work from home')")
+with Jevql() as db:
+    rows = db.query_dicts("SELECT name FROM people WHERE jev(people, 'could work from home')")
 ```
 
 See [Go](/docs/sdk-go/), [TypeScript](/docs/sdk-typescript/) and [Python](/docs/sdk-python/).
