@@ -1,6 +1,6 @@
 {
   "name": "jevql",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Client SDK for jevql: semantic SQL (jev()) on vanilla Postgres. Bundles the engine; no separate install.",
   "license": "MIT",
   "type": "module",
@@ -44,9 +44,9 @@
     "typescript": "^5.6.0"
   },
   "optionalDependencies": {
-    "@jevql/engine-darwin-arm64": "0.2.0",
-    "@jevql/engine-darwin-x64": "0.2.0",
-    "@jevql/engine-linux-x64": "0.2.0",
-    "@jevql/engine-linux-arm64": "0.2.0"
+    "@jevql/engine-darwin-arm64": "0.3.0",
+    "@jevql/engine-darwin-x64": "0.3.0",
+    "@jevql/engine-linux-x64": "0.3.0",
+    "@jevql/engine-linux-arm64": "0.3.0"
   }
 }
