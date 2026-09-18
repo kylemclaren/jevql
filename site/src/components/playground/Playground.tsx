@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import { Toaster, toast } from "@/components/ui/toast"
 import { highlightSQL } from "./highlight"
 
 /* ─────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ export default function Playground() {
   const [token, setToken] = useLocal("jevql-play-token", "")
   const [sql, setSql] = useLocal("jevql-play-sql", EXAMPLES[0].sql)
   const [result, setResult] = useState<Result | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const setError = (msg: string | null) => { if (msg) toast.add({ type: "error", title: msg.includes(":") ? msg.slice(0, msg.indexOf(":")) : "error", description: msg.includes(":") ? msg.slice(msg.indexOf(":") + 1).trim() : msg, timeout: 8000 }) }
   const [busy, setBusy] = useState<"run" | "explain" | null>(null)
   const [tables, setTables] = useState<Table[]>([])
   const [detail, setDetail] = useState<TableDetail | null>(null)
@@ -128,6 +129,7 @@ export default function Playground() {
 
   return (
     <div className="pg">
+      <Toaster />
       <aside className="pg-side">
         <section className="pg-conn">
           <p className="eyebrow">node</p>
@@ -172,7 +174,6 @@ export default function Playground() {
           <div className={"pg-progress" + (busy ? " on" : "")} role="progressbar" aria-busy={!!busy} aria-label={busy === "explain" ? "planning" : "judging"}><i /></div>
         </div>
 
-        {error && <p className="pg-error" role="alert">{error}</p>}
 
         {result?.explain && (
           <div className="pg-explain">
