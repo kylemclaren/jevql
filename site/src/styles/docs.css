@@ -33,7 +33,7 @@ html[data-theme="dark"] .theme-toggle .sun { display: inline; }
 .doc-toc { position: sticky; top: 24px; align-self: start; font-family: ui-monospace, monospace; }
 .doc-toc-nav a { text-decoration: none; }
 .doc-crumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font: 900 .6rem/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-.doc-crumbs a { color: inherit; text-decoration: none; }
+.doc .doc-crumbs a { color: inherit; text-decoration: none; }
 .doc-crumbs a:hover { color: var(--ink); }
 .doc-crumbs b { color: var(--ink); }
 .doc-edit { margin-top: 36px !important; font: 800 .68rem ui-monospace, monospace; }
