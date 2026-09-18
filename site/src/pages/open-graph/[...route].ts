@@ -19,7 +19,6 @@ export const { getStaticPaths, GET } = await OGImageRoute({
       title: { size: 88, lineHeight: 0.98, weight: "Black", color: [23, 23, 21], families: ["Inter"] },
       description: { size: 30, lineHeight: 1.35, weight: "Medium", color: [102, 100, 94], families: ["JetBrains Mono"] },
     },
-    logo: { path: "./src/assets/og-logo.png", size: [96] },
     fonts: [
       "https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-900-normal.ttf",
       "https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-500-normal.ttf",

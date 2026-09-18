@@ -1,6 +1,5 @@
 ---
 import Layout from "@/layouts/main.astro"
-import Mark from "@/mark.svg"
 
 const repo = "https://github.com/kylemclaren/jevql"
 const install = "brew install kylemclaren/tap/jevql"
@@ -9,7 +8,7 @@ const install = "brew install kylemclaren/tap/jevql"
 <Layout>
   <main class="page">
     <header class="mast">
-      <a class="brand" href="./"><Mark /> jevql</a>
+      <a class="brand" href="./">jevql</a>
       <div class="mast-right">
         <span class="tagline">Semantic SQL for vanilla Postgres</span>
         <a class="repo-link" href={repo} target="_blank" rel="noopener" aria-label="GitHub repository (opens in a new tab)">
@@ -397,8 +396,6 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   button.secondary:hover:not(:disabled) { background: var(--lime); }
   button.small { padding: 8px 9px; box-shadow: 2px 2px 0 var(--ink); }
   .mast .repo-link { display: inline-flex; align-items: center; gap: 7px; }
-  .brand { display: inline-flex; align-items: center; gap: 9px; }
-  .brand svg { width: 26px; height: 26px; }
   .section-head { margin-bottom: 16px; }
   .section-head h2 code { font: inherit; }
 
