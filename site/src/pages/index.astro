@@ -186,7 +186,7 @@ Linux amd64 · arm64</pre></div>
   .install-cta button { text-transform: none; }
   button.secondary { background: #fff; }
   button.secondary:hover { background: var(--lime); }
-  dialog { width: min(560px, calc(100% - 28px)); border: 1.5px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--ink); padding: 22px; box-shadow: 6px 6px 0 var(--ink); font-family: ui-monospace, monospace; }
+  dialog { position: fixed; inset: 0; margin: auto; max-height: calc(100vh - 40px); overflow: auto; width: min(560px, calc(100% - 28px)); border: 1.5px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--ink); padding: 22px; box-shadow: 6px 6px 0 var(--ink); font-family: ui-monospace, monospace; }
   dialog::backdrop { background: rgba(23, 23, 21, .55); }
   .dl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .dl-head h2 { margin: 0; font: 900 1.6rem/1 Arial, sans-serif; letter-spacing: -.045em; }
