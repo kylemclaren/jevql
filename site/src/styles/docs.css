@@ -8,6 +8,8 @@ html[data-theme="dark"] {
 html[data-theme="dark"] .doc code { background: #2a2922; }
 html[data-theme="dark"] .doc th, html[data-theme="dark"] .doc blockquote, html[data-theme="dark"] .doc-tab { background: #26251f; }
 html[data-theme="dark"] .doc-tab[aria-selected="true"] { background: var(--lime); color: #171715; }
+html[data-theme="dark"] .copy-btn { box-shadow: 2px 2px 0 var(--line); }
+html[data-theme="dark"] .copy-btn:hover { background: #26251f; }
 html[data-theme="dark"] .palette, html[data-theme="dark"] .palette-input input { color: var(--ink); }
 html[data-theme="dark"] .kbd { background: #26251f; }
 html[data-theme="dark"] .doc a:hover, html[data-theme="dark"] .repo-link:hover, html[data-theme="dark"] a.card:hover, html[data-theme="dark"] .doc-pager a:hover { color: #171715; }
@@ -22,16 +24,25 @@ html[data-theme="dark"] .theme-toggle .sun { display: inline; }
 /* Documentation shell, on top of the openjev stylesheet. */
 .docs-body { margin: 0; }
 .docs-mast { width: min(1400px, calc(100% - 32px)); margin: 0 auto; padding-top: 18px; }
+.docs-mast .brand { display: inline-flex; align-items: center; gap: 9px; }
+.docs-mast .brand svg { width: 26px; height: 26px; }
 .docs-tag { margin-left: 8px; padding: 3px 6px; background: var(--lime); font-size: .58rem; letter-spacing: .06em; vertical-align: middle; }
 .docs-shell { display: flex; gap: 28px; width: min(1400px, calc(100% - 32px)); margin: 0 auto; padding: 22px 0 60px; align-items: flex-start; }
 .docs-sidebar { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
 .docs-main { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 40px; flex: 1; min-width: 0; }
-.doc-toc { position: sticky; top: 24px; align-self: start; font-size: .7rem; }
-.doc-toc ul { list-style: none; margin: 0; padding: 0; border-left: 1.5px solid var(--line); }
-.doc-toc li a { display: block; padding: 4px 0 4px 12px; margin-left: -1.5px; border-left: 1.5px solid transparent; color: var(--muted); text-decoration: none; font-weight: 700; }
-.doc-toc li.d3 a { padding-left: 24px; font-weight: 500; }
-.doc-toc li a:hover { color: var(--ink); }
-.doc-toc li a.active { color: var(--ink); border-left-color: var(--pink); }
+.doc-toc { position: sticky; top: 24px; align-self: start; font-family: ui-monospace, monospace; }
+.doc-toc-nav a { text-decoration: none; }
+.doc-crumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font: 900 .6rem/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.doc-crumbs a { color: inherit; text-decoration: none; }
+.doc-crumbs a:hover { color: var(--ink); }
+.doc-crumbs b { color: var(--ink); }
+.doc-edit { margin-top: 36px !important; font: 800 .68rem ui-monospace, monospace; }
+.doc-edit a { text-decoration: none; color: var(--muted); }
+.doc-edit a:hover { color: var(--ink); background: transparent; }
+.heading-anchor { margin-left: 8px; color: var(--line); text-decoration: none !important; font-weight: 500; opacity: 0; transition: opacity 120ms; }
+.doc h2:hover .heading-anchor, .doc h3:hover .heading-anchor { opacity: 1; }
+.heading-anchor:hover { color: var(--pink); background: transparent !important; }
+.doc h2, .doc h3 { scroll-margin-top: 24px; }
 
 /* article */
 .doc { min-width: 0; max-width: 760px; font: 500 .98rem/1.6 Arial, sans-serif; }
@@ -94,6 +105,7 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
 .doc-pager small { display: block; margin-bottom: 4px; font: 900 .58rem/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .doc-pager strong { font: 900 .95rem/1.2 Arial, sans-serif; letter-spacing: -.02em; }
 
+.glide-highlight { z-index: 0; }
 /* the openjev stylesheet styles every <button>; the sidebar uses its own */
 .docs-sidebar button { border: 0; background: transparent; box-shadow: none; padding: 0; font: inherit; text-transform: none; }
 .docs-sidebar button:active:not(:disabled) { transform: none; box-shadow: none; }
@@ -139,9 +151,11 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
 /* copy buttons on code blocks */
 .copy-wrap { position: relative; margin: 0 0 18px; }
 .copy-wrap > pre { margin: 0; }
-.copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 8px; border: 1px solid var(--ink); background: var(--panel); box-shadow: none; font-size: .56rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; color: var(--ink); opacity: 0; transition: opacity 120ms; cursor: pointer; }
-.copy-wrap:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done { opacity: 1; }
+.copy-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1.5px solid var(--ink); background: var(--panel); box-shadow: 2px 2px 0 var(--ink); color: var(--ink); opacity: 0; transition: opacity 120ms, background-color 120ms; cursor: pointer; }
+.copy-wrap:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done, .copy-btn.failed { opacity: 1; }
+.copy-btn:hover { background: var(--hover-2, #ecebe4); }
 .copy-btn.done { background: var(--lime); color: #171715; }
+.copy-btn.failed { background: var(--red); color: #fff; }
 .copy-btn:active:not(:disabled) { transform: none; box-shadow: none; }
 @media (hover: none) { .copy-btn { opacity: 1; } }
 @media (max-width: 750px) { .docs-search-btn span, .docs-search-btn kbd { display: none; } }

@@ -5,6 +5,8 @@ import "@/styles/docs.css"
 import { getCollection } from "astro:content"
 import DocsSidebar from "@/components/docs/DocsSidebar"
 import DocsSearch from "@/components/docs/DocsSearch"
+import DocsToc from "@/components/docs/DocsToc"
+import Mark from "@/mark.svg"
 import { render } from "astro:content"
 import type { MarkdownHeading } from "astro"
 
@@ -61,7 +63,7 @@ const ogImage = new URL("/open-graph/index.png", Astro.site ?? Astro.url).href
   </head>
   <body class="docs-body">
     <header class="mast docs-mast">
-      <a class="brand" href="/">jevql <span class="docs-tag">docs</span></a>
+      <a class="brand" href="/"><Mark /> jevql <span class="docs-tag">docs</span></a>
       <div class="mast-right">
         <DocsSearch client:load pages={searchPages} />
         <button class="repo-link theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">
@@ -74,10 +76,11 @@ const ogImage = new URL("/open-graph/index.png", Astro.site ?? Astro.url).href
       <DocsSidebar client:load groups={groups} pathname={pathname} />
       <main class="docs-main">
         <article class="doc">
-          <p class="eyebrow">{all[idx]?.data.section ?? "docs"}</p>
+          <nav class="doc-crumbs" aria-label="Breadcrumb"><a href="/docs/">docs</a><span>/</span><span>{all[idx]?.data.section ?? "page"}</span><span>/</span><b>{title}</b></nav>
           <h1>{title}</h1>
           <p class="doc-lede">{description}</p>
           <slot />
+          <p class="doc-edit"><a href={`${repo}/blob/main/site/src/content/docs/${id}.mdx`} target="_blank" rel="noopener">Edit this page on GitHub ↗</a></p>
           <nav class="doc-pager" aria-label="Previous and next page">
             {prev ? <a href={`/docs/${prev.id}/`}><small>← previous</small><strong>{prev.data.title}</strong></a> : <span />}
             {next ? <a class="next" href={`/docs/${next.id}/`}><small>next →</small><strong>{next.data.title}</strong></a> : <span />}
@@ -85,12 +88,7 @@ const ogImage = new URL("/open-graph/index.png", Astro.site ?? Astro.url).href
         </article>
         {toc.length > 1 && (
           <aside class="doc-toc" aria-label="On this page">
-            <p class="eyebrow">on this page</p>
-            <ul>
-              {toc.map((h) => (
-                <li class={`d${h.depth}`}><a href={`#${h.slug}`}>{h.text}</a></li>
-              ))}
-            </ul>
+            <DocsToc client:load headings={toc.map((h) => ({ depth: h.depth, slug: h.slug, text: h.text }))} />
           </aside>
         )}
       </main>
@@ -102,21 +100,14 @@ const ogImage = new URL("/open-graph/index.png", Astro.site ?? Astro.url).href
         document.documentElement.setAttribute("data-theme", next)
         try { localStorage.setItem("jevql-docs-theme", next) } catch {}
       })
-      // highlight the current heading in the table of contents
-      const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".doc-toc a"))
-      const heads = links.map((a) => document.getElementById(decodeURIComponent(a.hash.slice(1)))).filter(Boolean) as HTMLElement[]
-      if (heads.length) {
-        const obs = new IntersectionObserver(
-          (entries) => {
-            for (const e of entries) {
-              if (e.isIntersecting) {
-                links.forEach((l) => l.classList.toggle("active", l.hash === "#" + e.target.id))
-              }
-            }
-          },
-          { rootMargin: "-10% 0px -80% 0px" },
-        )
-        heads.forEach((h) => obs.observe(h))
+      // heading anchor links
+      for (const h of document.querySelectorAll<HTMLElement>(".doc h2[id], .doc h3[id]")) {
+        const a = document.createElement("a")
+        a.href = "#" + h.id
+        a.className = "heading-anchor"
+        a.setAttribute("aria-label", "Link to this section")
+        a.textContent = "#"
+        h.appendChild(a)
       }
     </script>
   </body>

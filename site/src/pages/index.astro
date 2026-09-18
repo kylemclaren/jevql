@@ -474,8 +474,9 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .copy-wrap { position: relative; }
   .copy-wrap > pre { margin: 0; }
   .lane .copy-wrap { margin-top: 14px; }
-  .copy-btn { position: absolute; top: 6px; right: 6px; padding: 4px 8px; border: 1px solid var(--ink); background: #fff; box-shadow: none; font-size: .56rem; letter-spacing: .05em; opacity: 0; transition: opacity 120ms; }
+  .copy-btn { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 1.5px solid var(--ink); background: #fff; box-shadow: 2px 2px 0 var(--ink); opacity: 0; transition: opacity 120ms, background-color 120ms; }
   .copy-wrap:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.done { opacity: 1; }
+  .copy-btn:hover { background: #ecebe4; }
   .copy-btn.done { background: var(--lime); }
   .copy-btn:active:not(:disabled) { transform: none; box-shadow: none; }
   @media (hover: none) { .copy-btn { opacity: 1; } }

@@ -66,7 +66,7 @@ const Rail = ({
             ? { backgroundImage: DASH }
             : { backgroundColor: "currentColor" }
         }
-        className="absolute left-0.5 w-px"
+        className="absolute left-0.5 w-[1.5px]"
       />
       <motion.svg
         initial={false}
@@ -79,7 +79,7 @@ const Rail = ({
         className="absolute left-0.5"
       >
         <path
-          d="M0.5 0a6 6 0 0 0 6 6H12"
+          d="M0.5 0V6.5H12"
           stroke="currentColor"
           strokeDasharray={dashed ? "2 2" : undefined}
         />
@@ -199,7 +199,7 @@ export function HookSidebar({
             onBlur: () => setFocusInside(false),
             onClick: () => select(index),
             className: cn(
-              "rounded-[6px] py-1.5 pl-5 pr-2 text-left text-[0.8rem] font-bold transition-colors duration-200 motion-reduce:transition-none",
+              "py-1 pl-5 pr-2 text-left text-[0.72rem] font-bold leading-snug transition-colors duration-200 motion-reduce:transition-none",
               isActive
                 ? "text-ink"
                 : "text-ink-2 hover:text-ink",
