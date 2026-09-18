@@ -24,7 +24,7 @@ const install = "brew install kylemclaren/tap/jevql"
       <p class="lede">
         Write <code>WHERE jev(people, 'could work from home')</code>. jevql runs the SQL on Postgres,
         judges the rows with TypeSafe's Jev model, and prints a psql table. Nothing to install on the server,
-no <code>CREATE EXTENSION</code>, nothing to ask your DBA for: Postgres only ever sees plain SQL.
+        no <code>CREATE EXTENSION</code>, nothing to ask your DBA for: Postgres only ever sees plain SQL.
       </p>
       <div class="truth-strip">
         <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
@@ -33,7 +33,7 @@ no <code>CREATE EXTENSION</code>, nothing to ask your DBA for: Postgres only eve
         <button id="download" type="button">
           <span class="material-symbols-rounded" aria-hidden="true">download</span> download jevql
         </button>
-        <button id="copy-install" class="secondary" type="button" data-copy={install}>
+        <button class="secondary copy" type="button" data-copy={install}>
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
       </div>
@@ -41,41 +41,54 @@ no <code>CREATE EXTENSION</code>, nothing to ask your DBA for: Postgres only eve
 
     <dialog id="dl" aria-labelledby="dl-title">
       <div class="dl-head">
-        <div><p class="eyebrow">download</p><h2 id="dl-title">Pick your platform</h2></div>
+        <div><p class="eyebrow">download</p><h2 id="dl-title">Get jevql</h2></div>
         <button id="dl-close" class="secondary" type="button" aria-label="Close">✕</button>
       </div>
       <p class="dl-version">latest release: <strong id="dl-tag">…</strong></p>
-      <div class="dl-grid" id="dl-grid">
-        <a data-os="darwin" data-arch="arm64" href={`${repo}/releases/latest`}><small>macOS</small><strong>Apple Silicon</strong><span>arm64</span></a>
-        <a data-os="darwin" data-arch="amd64" href={`${repo}/releases/latest`}><small>macOS</small><strong>Intel</strong><span>x86_64</span></a>
-        <a data-os="linux" data-arch="amd64" href={`${repo}/releases/latest`}><small>Linux</small><strong>x86_64</strong><span>amd64</span></a>
-        <a data-os="linux" data-arch="arm64" href={`${repo}/releases/latest`}><small>Linux</small><strong>ARM</strong><span>arm64</span></a>
+      <div class="dl-curl">
+        <small>one line, detects your platform</small>
+        <div class="dl-curl-row">
+          <code id="curl-line">curl -fsSL …/install.sh | sh</code>
+          <button class="secondary copy small" type="button" data-copy-from="curl-line" aria-label="Copy install command"><span class="material-symbols-rounded" aria-hidden="true">content_copy</span></button>
+        </div>
       </div>
-      <p class="fine">Tarball with the <code>jevql</code> binary. Unpack it somewhere on your PATH. Checksums are on the <a href={`${repo}/releases/latest`}>release page</a>. Or <code>brew install kylemclaren/tap/jevql</code>.</p>
+      <p class="dl-or">or pick a tarball</p>
+      <div class="dl-grid" id="dl-grid">
+        {[
+          ["darwin", "arm64", "macOS", "Apple Silicon"],
+          ["darwin", "amd64", "macOS", "Intel"],
+          ["linux", "amd64", "Linux", "x86_64"],
+          ["linux", "arm64", "Linux", "arm64"],
+        ].map(([os, arch, label, name]) => (
+          <div class="dl-tile" data-os={os} data-arch={arch}>
+            <small>{label}</small>
+            <strong>{name}</strong>
+            <div class="dl-actions">
+              <a class="dl-get" href={`${repo}/releases/latest`} download><span class="material-symbols-rounded" aria-hidden="true">download</span> download</a>
+              <button class="dl-copy copy small" type="button" data-copy="" aria-label={`Copy ${label} ${name} link`}><span class="material-symbols-rounded" aria-hidden="true">link</span></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="fine">Tarballs contain the <code>jevql</code> binary; unpack it onto your PATH. Checksums are on the <a href={`${repo}/releases/latest`}>release page</a>.</p>
     </dialog>
 
-    <section class="race" aria-label="Example query and result">
-      <article class="lane direct">
-        <div class="lane-head"><div><p class="eyebrow">you type</p><h2>SQL, with one new function</h2></div><span class="badge">query</span></div>
-        <pre class="output">SELECT name, city,
-       jev_prob(people, 'could work from home') AS p
-FROM people
-WHERE jev(people, 'could work from home')
-  AND country = 'PT'
-ORDER BY p DESC
-LIMIT 20;</pre>
-      </article>
-      <article class="lane generated">
-        <div class="lane-head"><div><p class="eyebrow">you get</p><h2>A table, and the bill</h2></div><span class="badge pink">result</span></div>
-        <pre class="output">     name      |  city  |  p
----------------+--------+------
- Miguel Costa  | Lisbon | 0.94
- Ada Fernandes | Lisbon | 0.93
- Pedro Martins | Lisbon | 0.91
-(3 rows)
-
-jev: 6 judged, 1 req, 0 cache hits, 1.2k tokens, $0.0001, 1.35s</pre>
-      </article>
+    <section class="examples" aria-label="Examples">
+      <div class="examples-head">
+        <p class="eyebrow">examples · <span id="ex-name">people</span></p>
+        <div class="dots" id="ex-dots" role="tablist" aria-label="Pick an example"></div>
+      </div>
+      <div class="race">
+        <article class="lane direct">
+          <div class="lane-head"><div><p class="eyebrow">you type</p><h2>SQL, with one new function</h2></div><span class="badge">query</span></div>
+          <pre class="output" id="ex-query"></pre>
+        </article>
+        <article class="lane generated">
+          <div class="lane-head"><div><p class="eyebrow">you get</p><h2>A table, and the bill</h2></div><span class="badge pink">result</span></div>
+          <pre class="output" id="ex-result"></pre>
+        </article>
+      </div>
+      <div class="meter ex-meter" aria-hidden="true"><i id="ex-progress"></i></div>
     </section>
 
     <section class="method-map" aria-label="How a query runs">
@@ -92,9 +105,9 @@ jev: 6 judged, 1 req, 0 cache hits, 1.2k tokens, $0.0001, 1.35s</pre>
         <a class="repo-link" href={`${repo}#sql-surface`}>full surface ↗</a>
       </div>
       <div class="phases" aria-label="Functions">
-        <div class="phase"><small>boolean</small><strong>jev()</strong><span><code>jev(p, 'condition' [, 0.7])</code><br />a calibrated probability against a threshold. Works in WHERE, also as NOT jev().</span></div>
-        <div class="phase"><small>numbers</small><strong>jev_prob() jev_score()</strong><span><code>jev_prob(p, 'condition')</code> → 0..1<br /><code>jev_score(p, 'q', ARRAY['lo','mid','hi'])</code> → weighted index</span></div>
-        <div class="phase"><small>labels</small><strong>jev_choice()</strong><span><code>jev_choice(t, 'which team?', ARRAY['billing','technical'])</code><br />works with GROUP BY and count(*).</span></div>
+        <div class="phase"><small>boolean</small><strong>jev()</strong><span><code>jev(p, 'condition' [, 0.7])</code><br />A calibrated probability against a threshold. Works in WHERE, also as <code>NOT jev()</code>.</span></div>
+        <div class="phase"><small>numbers</small><strong>jev_prob() · jev_score()</strong><span><code>jev_prob(p, 'condition')</code> → 0..1<br /><code>jev_score(p, 'q', ARRAY['lo','mid','hi'])</code> → weighted level</span></div>
+        <div class="phase"><small>labels</small><strong>jev_choice()</strong><span><code>jev_choice(t, 'which team?', ARRAY['billing','technical'])</code><br />Works with GROUP BY and count(*).</span></div>
       </div>
       <p class="fine">Send fewer columns with <code>jev((name, bio), '…')</code>. Anything without <code>jev_*</code> passes straight through, so it doubles as a plain psql.</p>
     </section>
@@ -105,11 +118,9 @@ jev: 6 judged, 1 req, 0 cache hits, 1.2k tokens, $0.0001, 1.35s</pre>
         <a class="repo-link" href={`${repo}/releases`}>releases ↗</a>
       </div>
       <div class="phases" aria-label="Install options">
+        <div class="phase"><small>shell</small><pre class="output" id="curl-line-2">curl -fsSL …/install.sh | sh</pre></div>
         <div class="phase"><small>homebrew</small><pre class="output">brew install kylemclaren/tap/jevql</pre></div>
-        <div class="phase"><small>go</small><pre class="output">CGO_ENABLED=1 go install \
-  github.com/kylemclaren/jevql/cmd/jevql@latest</pre></div>
-        <div class="phase"><small>binaries</small><pre class="output">macOS arm64 · x86_64
-Linux amd64 · arm64</pre></div>
+        <div class="phase"><small>go</small><pre class="output">go install github.com/kylemclaren/jevql/cmd/jevql@latest</pre><span>needs CGO for the Postgres parser</span></div>
       </div>
       <p class="fine">First launch asks for a database URL and a TypeSafe key and saves them to <code>~/.config/jevql/env</code>. Or use <code>DATABASE_URL</code>, <code>PG*</code> and <code>TYPESAFE_API_KEY</code> like any psql user.</p>
     </section>
@@ -131,11 +142,38 @@ Linux amd64 · arm64</pre></div>
   </main>
 
   <script>
-    const dl = document.getElementById("dl") as HTMLDialogElement | null
-    const open = document.getElementById("download")
-    const close = document.getElementById("dl-close")
-    const tagEl = document.getElementById("dl-tag")
     const repo = "https://github.com/kylemclaren/jevql"
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
+    // ---- copy buttons -------------------------------------------------
+    function flash(btn: HTMLElement, ok = true) {
+      const original = btn.innerHTML
+      btn.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">${ok ? "check" : "close"}</span>${btn.classList.contains("small") ? "" : " copied"}`
+      setTimeout(() => (btn.innerHTML = original), 1200)
+    }
+    document.addEventListener("click", async (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>(".copy")
+      if (!btn) return
+      const from = btn.dataset.copyFrom
+      const text = from ? document.getElementById(from)?.textContent || "" : btn.dataset.copy || ""
+      try {
+        await navigator.clipboard.writeText(text)
+        flash(btn)
+      } catch {
+        flash(btn, false)
+      }
+    })
+
+    // ---- install command reflects where the site is hosted -------------
+    const curl = `curl -fsSL ${location.origin}/install.sh | sh`
+    for (const id of ["curl-line", "curl-line-2"]) {
+      const el = document.getElementById(id)
+      if (el) el.textContent = curl
+    }
+
+    // ---- download dialog -----------------------------------------------
+    const dl = document.getElementById("dl") as HTMLDialogElement | null
+    const tagEl = document.getElementById("dl-tag")
     let loaded = false
     async function loadRelease() {
       if (loaded) return
@@ -147,35 +185,196 @@ Linux amd64 · arm64</pre></div>
         const tag: string = rel.tag_name
         const ver = tag.replace(/^v/, "")
         if (tagEl) tagEl.textContent = tag
-        for (const a of document.querySelectorAll<HTMLAnchorElement>("#dl-grid a")) {
-          const name = `jevql_${ver}_${a.dataset.os}_${a.dataset.arch}.tar.gz`
+        for (const tile of document.querySelectorAll<HTMLElement>(".dl-tile")) {
+          const name = `jevql_${ver}_${tile.dataset.os}_${tile.dataset.arch}.tar.gz`
           const asset = (rel.assets || []).find((x: { name: string }) => x.name === name)
-          a.href = asset ? asset.browser_download_url : `${repo}/releases/download/${tag}/${name}`
+          const url = asset ? asset.browser_download_url : `${repo}/releases/download/${tag}/${name}`
+          const a = tile.querySelector<HTMLAnchorElement>(".dl-get")
+          if (a) { a.href = url; a.setAttribute("download", name) }
+          const c = tile.querySelector<HTMLElement>(".dl-copy")
+          if (c) c.dataset.copy = url
         }
       } catch {
         if (tagEl) tagEl.textContent = "see releases page"
       }
     }
-    // Preselect the visitor's platform.
     const ua = navigator.userAgent
-    const guessOS = /Mac/i.test(ua) ? "darwin" : /Linux/i.test(ua) ? "linux" : ""
+    const guessOS = /Mac/i.test(ua) ? "darwin" : /Linux|Android/i.test(ua) ? "linux" : ""
     const guessArch = /arm64|aarch64/i.test(ua) ? "arm64" : "amd64"
-    document.querySelector(`#dl-grid a[data-os="${guessOS}"][data-arch="${guessArch}"]`)?.classList.add("likely")
-    open?.addEventListener("click", () => { loadRelease(); dl?.showModal() })
-    close?.addEventListener("click", () => dl?.close())
+    document.querySelector(`.dl-tile[data-os="${guessOS}"][data-arch="${guessArch}"]`)?.classList.add("likely")
+    document.getElementById("download")?.addEventListener("click", () => { loadRelease(); dl?.showModal() })
+    document.getElementById("dl-close")?.addEventListener("click", () => dl?.close())
     dl?.addEventListener("click", (e) => { if (e.target === dl) dl.close() })
 
-    const btn = document.getElementById("copy-install")
-    if (btn) {
-      const original = btn.innerHTML
-      btn.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(btn.dataset.copy || "")
-          btn.innerHTML = '<span class="material-symbols-rounded" aria-hidden="true">check</span> copied'
-          setTimeout(() => (btn.innerHTML = original), 1400)
-        } catch {}
-      })
+    // ---- rotating examples ---------------------------------------------
+    type Example = { name: string; query: string; result: string }
+    const examples: Example[] = [
+      {
+        name: "people",
+        query: `SELECT name, city,
+       jev_prob(people, 'could work from home') AS p
+FROM people
+WHERE jev(people, 'could work from home')
+  AND country = 'PT'
+ORDER BY p DESC
+LIMIT 20;`,
+        result: `     name      |  city  |  p
+---------------+--------+------
+ Miguel Costa  | Lisbon | 0.94
+ Ada Fernandes | Lisbon | 0.93
+ Pedro Martins | Lisbon | 0.91
+(3 rows)
+
+jev: 6 judged, 1 req, 0 cache hits, 1.2k tokens, $0.0001, 1.35s`,
+      },
+      {
+        name: "support tickets",
+        query: `SELECT jev_choice(tickets, 'which team should handle this?',
+                  ARRAY['billing','technical','sales']) AS team,
+       count(*)
+FROM tickets
+WHERE status = 'open'
+GROUP BY 1
+ORDER BY 2 DESC;`,
+        result: `   team    | count
+-----------+-------
+ technical |     3
+ sales     |     3
+ billing   |     1
+(3 rows)
+
+jev: 7 judged, 1 req, 0 cache hits, 1.2k tokens, $0.0001, 0.75s`,
+      },
+      {
+        name: "movies",
+        query: `SELECT title, year
+FROM movies
+WHERE jev(movies, 'a safe pick for a first date')
+  AND year >= 2010
+ORDER BY year DESC
+LIMIT 4;`,
+        result: `          title          | year
+-------------------------+------
+ Past Lives              | 2023
+ The Big Sick            | 2017
+ About Time              | 2013
+ Silver Linings Playbook | 2012
+(4 rows)
+
+jev: 412 judged, 11 req, 0 cache hits, 61.3k tokens, $0.0026, 4.1s`,
+      },
+      {
+        name: "inbox",
+        query: `SELECT sender, subject
+FROM emails
+WHERE NOT jev(emails, 'a newsletter or promotion')
+  AND received > now() - interval '1 day'
+ORDER BY received DESC;`,
+        result: `     sender      |            subject
+-----------------+--------------------------------
+ Joana Silva     | Re: Q4 hiring plan
+ Ravi Patel      | Invoice #4821 corrected
+ Ada Fernandes   | Can we ship Friday?
+(3 rows)
+
+jev: 58 judged, 2 req, 21 cache hits, 5.9k tokens, $0.0002, 1.9s`,
+      },
+      {
+        name: "reviews",
+        query: `SELECT product,
+       jev_score(reviews, 'how angry is the customer?',
+                 ARRAY['calm','annoyed','furious']) AS anger
+FROM reviews
+WHERE stars <= 2
+ORDER BY anger DESC
+LIMIT 3;`,
+        result: `    product     | anger
+----------------+-------
+ Cold brew kit  |  1.96
+ Desk lamp v2   |  1.41
+ Wool socks     |  0.87
+(3 rows)
+
+jev: 133 judged, 4 req, 0 cache hits, 21.0k tokens, $0.0009, 2.6s`,
+      },
+      {
+        name: "recipes",
+        query: `SELECT name, jev_prob(recipes, 'kid friendly') AS p
+FROM recipes
+WHERE jev((name, ingredients), 'vegetarian')
+ORDER BY p DESC
+LIMIT 3;`,
+        result: `        name         |  p
+---------------------+------
+ Mac and cheese      | 0.97
+ Margherita pizza    | 0.95
+ Lentil shepherd pie | 0.62
+(3 rows)
+
+jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
+      },
+    ]
+
+    const q = document.getElementById("ex-query")!
+    const res = document.getElementById("ex-result")!
+    const nameEl = document.getElementById("ex-name")!
+    const dots = document.getElementById("ex-dots")!
+    const bar = document.getElementById("ex-progress") as HTMLElement
+    const HOLD = 7000
+    let idx = 0, run = 0, paused = false, timer: number | undefined
+
+    examples.forEach((ex, i) => {
+      const b = document.createElement("button")
+      b.type = "button"
+      b.role = "tab"
+      b.setAttribute("aria-label", ex.name)
+      b.addEventListener("click", () => show(i, true))
+      dots.appendChild(b)
+    })
+
+    function setBar(active: boolean) {
+      bar.style.transition = "none"
+      bar.style.width = "0%"
+      if (!active) return
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        bar.style.transition = `width ${HOLD}ms linear`
+        bar.style.width = "100%"
+      }))
     }
+
+    async function show(i: number, manual = false) {
+      const my = ++run
+      if (timer) clearTimeout(timer)
+      idx = i
+      const ex = examples[i]
+      nameEl.textContent = ex.name
+      dots.querySelectorAll("button").forEach((b, j) => b.setAttribute("aria-selected", String(j === i)))
+      res.classList.remove("show")
+      res.textContent = ex.result
+      setBar(false)
+      if (reduced || manual) {
+        q.textContent = ex.query
+      } else {
+        q.textContent = ""
+        q.classList.add("typing")
+        for (let n = 1; n <= ex.query.length; n++) {
+          if (my !== run) return
+          q.textContent = ex.query.slice(0, n)
+          const ch = ex.query[n - 1]
+          await new Promise((r) => setTimeout(r, ch === "\n" ? 90 : 12))
+        }
+        q.classList.remove("typing")
+        await new Promise((r) => setTimeout(r, 250))
+        if (my !== run) return
+      }
+      res.classList.add("show")
+      setBar(true)
+      timer = window.setTimeout(() => { if (!paused) show((idx + 1) % examples.length) }, HOLD)
+    }
+    const wrap = document.querySelector(".examples")!
+    wrap.addEventListener("mouseenter", () => { paused = true })
+    wrap.addEventListener("mouseleave", () => { paused = false; if (!timer) show((idx + 1) % examples.length) })
+    show(0, true)
   </script>
 </Layout>
 
@@ -185,28 +384,62 @@ Linux amd64 · arm64</pre></div>
   .install-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
   .install-cta button { text-transform: none; }
   button.secondary { background: #fff; }
-  button.secondary:hover { background: var(--lime); }
-  dialog { position: fixed; inset: 0; margin: auto; max-height: calc(100vh - 40px); overflow: auto; width: min(560px, calc(100% - 28px)); border: 1.5px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--ink); padding: 22px; box-shadow: 6px 6px 0 var(--ink); font-family: ui-monospace, monospace; }
+  button.secondary:hover:not(:disabled) { background: var(--lime); }
+  button.small { padding: 8px 9px; box-shadow: 2px 2px 0 var(--ink); }
+  .mast .repo-link { display: inline-flex; align-items: center; gap: 7px; }
+  .section-head { margin-bottom: 16px; }
+  .section-head h2 code { font: inherit; }
+
+  /* examples */
+  .examples { margin-top: 24px; }
+  .examples-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .examples-head .eyebrow { margin: 0; }
+  .examples-head #ex-name { color: var(--pink); }
+  .dots { display: flex; gap: 6px; }
+  .dots button, .dots button:where(button) { width: 12px; height: 12px; min-height: 0; padding: 0; border: 1.5px solid var(--ink); background: #fff; box-shadow: none; }
+  @media (max-width: 750px) { .dots button { min-height: 0; height: 12px; width: 12px; } }
+  .dots button[aria-selected="true"] { background: var(--lime); }
+  .race { margin-top: 0; }
+  .lane { min-height: 0; }
+  .lane .output { margin: 14px 0 0; border: 0; padding: 0; min-height: 11.5em; }
+  #ex-query.typing::after { content: "▍"; color: var(--pink); animation: blink 1s steps(2) infinite; }
+  #ex-result { opacity: 0; transform: translateY(4px); transition: opacity .35s ease, transform .35s ease; }
+  #ex-result.show { opacity: 1; transform: none; }
+  .ex-meter { margin: 10px 0 0; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #ex-result { transition: none; } #ex-query.typing::after { animation: none; } }
+
+  /* method map */
+  .method-map { grid-template-columns: 1fr auto 1fr auto 1fr; }
+  .method-map strong { font-weight: 500; line-height: 1.45; }
+  @media (max-width: 750px) { .method-map { grid-template-columns: 1fr; } }
+
+  /* panels */
+  .phase .output { margin: 8px 0 0; padding: 0; border: 0; font-size: .66rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .phase strong { font-size: 1.1rem; }
+  .phase span { margin-top: 8px; }
+  .phase span code { font-weight: 800; }
+
+  /* dialog */
+  dialog { position: fixed; inset: 0; margin: auto; max-height: calc(100vh - 40px); overflow: auto; width: min(600px, calc(100% - 28px)); border: 1.5px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--ink); padding: 22px; box-shadow: 6px 6px 0 var(--ink); font-family: ui-monospace, monospace; }
   dialog::backdrop { background: rgba(23, 23, 21, .55); }
   .dl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
   .dl-head h2 { margin: 0; font: 900 1.6rem/1 Arial, sans-serif; letter-spacing: -.045em; }
-  .dl-head button { padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); }
   .dl-version { margin: 12px 0 0; font-size: .68rem; font-weight: 800; text-transform: uppercase; }
-  .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-  .dl-grid a { display: block; border: 1.5px solid var(--ink); background: #fff; padding: 13px; color: inherit; text-decoration: none; }
-  .dl-grid a:hover { background: var(--lime); }
-  .dl-grid a.likely { box-shadow: 3px 3px 0 var(--ink); }
-  .dl-grid small { display: block; margin-bottom: 6px; font-size: .58rem; font-weight: 900; text-transform: uppercase; }
-  .dl-grid strong { display: block; font-size: .95rem; }
-  .dl-grid span { display: block; margin-top: 4px; color: var(--muted); font-size: .62rem; }
+  .dl-curl { margin-top: 14px; border: 1.5px solid var(--ink); background: var(--lime); padding: 12px; }
+  .dl-curl small { display: block; margin-bottom: 8px; font-size: .58rem; font-weight: 900; text-transform: uppercase; }
+  .dl-curl-row { display: flex; align-items: center; gap: 10px; }
+  .dl-curl-row code { flex: 1; font-size: .72rem; overflow-wrap: anywhere; }
+  .dl-or { margin: 14px 0 8px; font-size: .62rem; font-weight: 900; text-transform: uppercase; color: var(--muted); }
+  .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dl-tile { border: 1.5px solid var(--ink); background: #fff; padding: 12px; }
+  .dl-tile.likely { box-shadow: 3px 3px 0 var(--ink); }
+  .dl-tile small { display: block; margin-bottom: 4px; font-size: .58rem; font-weight: 900; text-transform: uppercase; }
+  .dl-tile strong { display: block; font-size: .95rem; }
+  .dl-actions { display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+  .dl-get { display: inline-flex; align-items: center; gap: 6px; flex: 1; border: 1.5px solid var(--ink); background: var(--lime); box-shadow: 2px 2px 0 var(--ink); padding: 8px 10px; color: inherit; text-decoration: none; font-size: .66rem; font-weight: 900; text-transform: uppercase; }
+  .dl-get:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+  .dl-copy { background: #fff; }
+  dialog .fine { margin-top: 14px; }
   @media (max-width: 480px) { .dl-grid { grid-template-columns: 1fr; } }
-  .mast .repo-link { display: inline-flex; align-items: center; gap: 7px; }
-  .lane .output { margin: 14px 0 0; border: 0; padding: 0; }
-  .method-map { grid-template-columns: 1fr auto 1fr auto 1fr; }
-  .method-map strong { font-weight: 500; line-height: 1.45; }
-  .phase .output { margin: 8px 0 0; padding: 0; border: 0; font-size: .66rem; white-space: pre-wrap; }
-  .phase strong { font-size: 1.1rem; }
-  .phase span code { font-weight: 800; }
-  .section-head h2 code { font: inherit; }
-  @media (max-width: 750px) { .method-map { grid-template-columns: 1fr; } }
 </style>
