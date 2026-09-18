@@ -112,7 +112,7 @@ jobs:
           bun install --frozen-lockfile
           bun run build
           node scripts/make-platform-packages.mjs --version "$VERSION" --tarballs ../../artifacts --out ../../dist-npm
-          npm version "$VERSION" --no-git-tag-version
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
       - name: python wheels
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
