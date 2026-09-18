@@ -1,0 +1,58 @@
+---
+title: Install
+description: Get the jevql binary onto your machine.
+section: Start
+order: 2
+---
+
+jevql is a single static binary for macOS and Linux. Pick whichever route suits you.
+
+<Tabs labels={["Homebrew", "Shell script", "Go", "Tarball"]} storageKey="install">
+<div>
+
+```bash
+brew install kylemclaren/tap/jevql
+```
+
+The tap serves prebuilt binaries for Apple Silicon, Intel Macs and Linux. Upgrade with `brew upgrade jevql`.
+
+</div>
+<div>
+
+```bash
+curl -fsSL https://jev-pg-dvft.sprites.app/install.sh | sh
+```
+
+Detects your OS and architecture, downloads the matching release, verifies its sha256 against `checksums.txt`, and installs to `/usr/local/bin` or `~/.local/bin`. Set `JEVQL_VERSION` to pin a version and `JEVQL_INSTALL_DIR` to choose the directory.
+
+</div>
+<div>
+
+```bash
+CGO_ENABLED=1 go install github.com/kylemclaren/jevql/cmd/jevql@latest
+```
+
+Needs Go 1.23+ and a C compiler: the Postgres parser is compiled from libpg_query. The first build takes about a minute.
+
+</div>
+<div>
+
+Download `jevql_<version>_<os>_<arch>.tar.gz` from the [releases page](https://github.com/kylemclaren/jevql/releases), verify it against `checksums.txt`, and put the `jevql` binary on your `PATH`.
+
+</div>
+</Tabs>
+
+Check it worked:
+
+```bash
+jevql --version
+```
+
+## Requirements
+
+- A PostgreSQL you can already connect to. Any version a modern psql speaks to is fine; jevql was tested against 17.
+- A TypeSafe API key for jev queries. Plain SQL works without one.
+
+## Upgrading
+
+Homebrew and the shell script always fetch the latest release. Go users rerun `go install`. Your cache and config are kept across versions; the cache key includes the model name, so a model change simply misses the cache.

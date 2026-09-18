@@ -1,0 +1,36 @@
+---
+title: Security and honesty
+description: What leaves your machine, what is stored, and what jevql will not do.
+section: Reference
+order: 30
+---
+
+<Callout kind="danger" title="Row contents go to TypeSafe">
+Every column of the judged alias, or the columns you list, is sent over HTTPS to the TypeSafe API. Do not use jevql on data you cannot share with TypeSafe. Use `jev((col, ...), ...)` or `--columns` to send the minimum.
+</Callout>
+
+## What is sent
+
+Only the rows that survive your SQL filters, only the columns of the judged source, as JSON. Nothing else about the schema or the query is sent. `--explain` shows the exact collect SQL and how many rows it returns without making any API call.
+
+## What is stored locally
+
+- `~/.cache/jevql/cache.db`: sha256 keys derived from row contents, and the answers. Mode `0600`. Not encrypted. `\cache clear` deletes everything.
+- `~/.config/jevql/env`: only if you accept the offer on first launch. Holds the database URL (with password) and API key in plain text, mode `0600`.
+- The REPL history at `~/.cache/jevql/history`.
+
+## Keys
+
+The API key comes from `--api-key`, `TYPESAFE_API_KEY`, the prompt, or the config file. It is never printed and never logged, including with `-v`. `TYPESAFE_API_URL` lets you route through a proxy that injects credentials, so the key need not exist on the machine at all.
+
+## Cost controls
+
+- `--max-rows` (default 2500) aborts before any HTTP call when the collect is too large. Exit code 2.
+- `--max-chars` does the same by payload size.
+- The footer and `-v` report tokens and dollars from the usage the API returns; the price used is $0.042 per million input tokens.
+
+## What it is not
+
+- Not a Postgres extension. The server never learns `jev()`; applications sending it through a driver will fail until they go through jevql, an SDK, or a real extension.
+- Not a wire-compatible psql for GUI tools.
+- Not a sampler. A jev query judges every row the SQL lets through. Cheap predicates first.

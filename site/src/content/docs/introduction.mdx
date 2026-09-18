@@ -1,0 +1,64 @@
+---
+title: Introduction
+description: What jevql is, what it is not, and the one idea behind it.
+section: Start
+order: 1
+---
+
+jevql is a psql-shaped command line client for PostgreSQL that understands one extra family of SQL functions:
+
+```sql
+SELECT name, city, jev_prob(people, 'could work from home') AS p
+FROM people
+WHERE jev(people, 'could work from home')
+  AND country = 'PT'
+ORDER BY p DESC
+LIMIT 20;
+```
+
+`jev(people, 'could work from home')` is a yes/no judgement about each row, made by TypeSafe's Jev model. Everything else in that statement is ordinary SQL, and that is exactly what Postgres receives. The judgement happens in the client.
+
+## The one idea
+
+Postgres cannot evaluate `jev()`, so jevql runs a statement in two passes:
+
+1. **Collect.** The statement is parsed with libpg_query, the real Postgres parser. Every `jev_*` term is stripped, the columns needed to describe each row are added, and the rest is sent to the server. Indexed filters such as `country = 'PT'` stay on the server where they belong.
+2. **Judge.** The rows that come back are packed into batches and sent to TypeSafe with one question per row. Identical rows are judged once. Answers are cached locally in sqlite, so the second run costs nothing.
+3. **Project.** Booleans, probabilities, choices and scores are attached in the client, then filter, group, sort and limit are applied and a psql table is printed.
+
+<Callout kind="tip" title="Nothing to install on the server">
+There is no extension, no `CREATE EXTENSION`, no proxy in front of Postgres. If you can connect with psql, you can use jevql. Managed databases work.
+</Callout>
+
+## What it is not
+
+- It is not a Postgres extension. `jev()` exists only inside jevql and its SDKs. An application that sends `WHERE jev(...)` through a normal driver gets "function does not exist".
+- It is not free of data movement. The row contents you judge are sent to TypeSafe over HTTPS. Read [Security](/docs/security/) before pointing it at real data.
+- It is not magic. Every jev query scans everything your SQL filters let through. Put cheap predicates first, and use `--explain` to see the cost before you pay it.
+
+## From your code
+
+The same engine is available as libraries. Go links it in process; TypeScript and Python talk to a local `jevql serve` or spawn the binary.
+
+```go
+rows, err := client.QueryMaps(ctx, "SELECT name FROM people WHERE jev(people, 'could work from home')")
+```
+
+```ts
+const rows = await db.queryObjects("SELECT name FROM people WHERE jev(people, 'could work from home')")
+```
+
+```python
+rows = db.query_dicts("SELECT name FROM people WHERE jev(people, 'could work from home')")
+```
+
+See [Go](/docs/sdk-go/), [TypeScript](/docs/sdk-typescript/) and [Python](/docs/sdk-python/).
+
+## Where next
+
+<Cards>
+  <Card title="Install" href="/docs/install/" eyebrow="2 minutes">Homebrew, a one-line script, Go, or a tarball.</Card>
+  <Card title="Quick start" href="/docs/quickstart/" eyebrow="5 minutes">Connect, load sample data, run your first jev query.</Card>
+  <Card title="SQL surface" href="/docs/sql/" eyebrow="reference">Every `jev_*` function and where it may appear.</Card>
+  <Card title="SDKs" href="/docs/sdk-go/" eyebrow="integrate">Go in process; TypeScript and Python over a local server.</Card>
+</Cards>

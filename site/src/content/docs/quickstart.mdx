@@ -1,0 +1,73 @@
+---
+title: Quick start
+description: Connect, load a sample table, and run your first judgement.
+section: Start
+order: 3
+---
+
+<Steps>
+
+### Launch it
+
+```bash
+jevql
+```
+
+With nothing configured, jevql asks for a database URL and a TypeSafe API key (hidden input) and offers to save them to `~/.config/jevql/env` with mode `0600`. Next time it just connects.
+
+If you prefer environment variables, it reads the same ones psql does plus two of its own:
+
+```bash
+export DATABASE_URL=postgres://user:pass@localhost:5432/app   # or PGHOST, PGUSER, ...
+export TYPESAFE_API_KEY=tsk_...
+jevql
+```
+
+### Load some rows
+
+Any table will do. If you want the sample data from the repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kylemclaren/jevql/main/testdata/people.sql | jevql
+```
+
+That creates `people`, `cities` and `tickets` with a dozen rows each. Plain SQL passes straight through, so this is just psql behaviour.
+
+### Ask a question
+
+```sql
+SELECT name, job_title
+FROM people
+WHERE jev(people, 'could work from home');
+```
+
+```
+     name      |        job_title
+---------------+-------------------------
+ Ada Fernandes | Staff software engineer
+ Miguel Costa  | Technical writer
+ Tom Baker     | Customer support lead
+(3 rows)
+jev: 12 judged, 1 req, 0 cache hits, 2.1k in tokens, $0.0001, 2.57s
+```
+
+The footer tells you what it cost. Run the same statement again and you will see `12 cache hits, 0 req`.
+
+### Look before you leap
+
+```bash
+jevql --explain -c "SELECT name FROM people WHERE jev(people, 'could work from home')"
+```
+
+`--explain` prints the SQL Postgres will run, how many rows survive the SQL filters, and a token and dollar estimate. It makes no TypeSafe calls.
+
+</Steps>
+
+<Callout kind="note">
+`jev()` takes the FROM alias as its first argument: `people` here, or `p` if you wrote `FROM people p`. Every column of that relation goes into the judgement. To send less, list columns explicitly: `jev((name, job_title), '...')`.
+</Callout>
+
+## Next
+
+- [SQL surface](/docs/sql/) for `jev_prob`, `jev_choice`, `jev_score` and friends.
+- [CLI reference](/docs/cli/) for flags, formats and meta commands.

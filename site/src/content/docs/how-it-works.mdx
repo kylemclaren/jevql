@@ -1,0 +1,71 @@
+---
+title: How it works
+description: The two-pass execution in detail, and what the server actually sees.
+section: Use
+order: 13
+---
+
+Take this statement:
+
+```sql
+SELECT name, jev_prob(people, 'the name is European') AS p
+FROM people
+WHERE country = 'PT' AND jev(people, 'could work from home')
+ORDER BY p DESC
+LIMIT 10;
+```
+
+## Pass A: collect
+
+jevql parses the statement with libpg_query and finds every `jev_*` call. For each it resolves the first argument to a FROM alias and the columns that alias contributes. It then rewrites:
+
+- `jev(people, ...)` is removed from WHERE. `country = 'PT'` stays.
+- The SELECT list gains `people.id AS __jev_s0_0, people.name AS __jev_s0_1, ...` so the row object can be built. Your own columns follow, so `name` keeps its name.
+- `ORDER BY p` and `LIMIT 10` depend on a judgement, so they are dropped from the server statement.
+
+Postgres receives:
+
+```sql
+SELECT people.id AS __jev_s0_0, people.name AS __jev_s0_1, /* ... */ name
+FROM people
+WHERE country = 'PT'
+```
+
+If the row count exceeds `--max-rows`, jevql stops here with exit code 2. No HTTP call has been made.
+
+## Pass B: judge
+
+Each row becomes a canonical JSON object. Duplicate objects are collapsed. Each distinct object is looked up in the cache; misses are grouped by question and packed `--batch-size` at a time into requests like:
+
+```json
+{
+  "model": "jev-latest",
+  "state": {
+    "condition": "could work from home",
+    "rows": [
+      {"i": 0, "row": {"bio": "...", "job_title": "Staff engineer", "name": "Ada"}},
+      {"i": 1, "row": {"bio": "...", "job_title": "Line cook", "name": "Ravi"}}
+    ]
+  },
+  "questions": {
+    "row_0": {"type": "noul", "instructions": "Does the row in rows with \"i\": 0 satisfy the condition? ..."},
+    "row_1": {"type": "noul", "instructions": "..."}
+  }
+}
+```
+
+Requests run on a worker pool of `--concurrency`. Ctrl-C cancels everything in flight. Answers are written back to the cache.
+
+## Pass C: project
+
+In the client: `jev()` becomes `p >= threshold` and filters rows; `jev_prob` becomes a column; `ORDER BY p DESC` sorts; `LIMIT 10` cuts. GROUP BY with aggregates is computed here too. The result is printed as a psql table with a footer of what it cost.
+
+## When ORDER BY and LIMIT stay on the server
+
+Only when the collected rows are exactly the final rows: there is no jev predicate, no GROUP BY, and the sort key is not a judgement. Then
+
+```sql
+SELECT name, jev_prob(people, 'x') AS p FROM people ORDER BY name LIMIT 10
+```
+
+sends `ORDER BY name LIMIT 10` to Postgres and judges ten rows, not the whole table.

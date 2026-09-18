@@ -1,0 +1,96 @@
+---
+title: CLI reference
+description: Flags, output formats, meta commands and exit codes.
+section: Use
+order: 11
+---
+
+```
+jevql [flags] [dbname | postgres://...]
+jevql serve [--listen 127.0.0.1:7433] [--token SECRET] [dbname | postgres://...]
+```
+
+Flags may appear before or after the positional argument, as with psql.
+
+## Connection
+
+| Flag | Meaning |
+|---|---|
+| `-h host` `-p port` `-U user` `-d dbname` | as psql; `PGHOST`, `PGPORT`, `PGUSER`, `PGDATABASE`, `PGPASSWORD` are honoured |
+| `postgres://...` positional | a connection URI; `DATABASE_URL` is used when nothing else is given |
+| `-w` / `-W` | never prompt for a password / always prompt |
+
+## Running statements
+
+| Flag | Meaning |
+|---|---|
+| `-c "sql"` | run one or more statements and exit |
+| `-f file` | run a file and exit |
+| stdin | piped input is run like `-f` |
+| `--explain` | print the plan and a cost estimate; no TypeSafe calls |
+| `--timing` | print elapsed time after each statement |
+| `-v` | verbose: collect SQL, batches, tokens, cost |
+
+## Output
+
+| Flag | Meaning |
+|---|---|
+| default | aligned table like psql |
+| `--expanded` / `-x` | one record per block |
+| `--csv` | CSV with header |
+| `--json` | an array of objects |
+| `--json-table` | one JSON document per statement, the format the SDKs use ([protocol](/docs/serve/)) |
+
+Colour is used only when stdout is a terminal.
+
+## TypeSafe and budget
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--api-key` | `$TYPESAFE_API_KEY` | never printed |
+| `--api-url` | `https://api.typesafe.ai/v1/systemone` | or `$TYPESAFE_API_URL` |
+| `--model` | `jev-latest` | |
+| `--threshold` | `0.5` | default for `jev()`; or `$JEV_THRESHOLD` |
+| `--batch-size` | `40` | rows per request |
+| `--concurrency` | `6` | parallel requests |
+| `--max-rows` | `2500` | abort before any HTTP call if the collect exceeds this; `0` disables |
+| `--max-chars` | `0` | abort if row objects exceed this many characters |
+| `--columns a,b` | | columns to send for alias-form calls |
+| `--cache path` | `~/.cache/jevql/cache.db` | |
+| `--no-cache` | | |
+
+## Meta commands
+
+Available in the REPL and in scripts, one per line:
+
+| Command | |
+|---|---|
+| `\q` | quit |
+| `\timing [on\|off]` | toggle timing |
+| `\x [on\|off]` | expanded output |
+| `\d [name]` `\dt` `\dv` `\dn` `\l` | describe, via the catalogs |
+| `\set JEV_THRESHOLD 0.7` | also `JEV_MODEL`, `JEV_BATCH_SIZE`, `JEV_MAX_ROWS`, `TYPESAFE_API_KEY` |
+| `\cache [stats\|clear]` | inspect or empty the answer cache |
+| `\explain <query>` | like `--explain` for one statement |
+| `\i file` | run a file |
+| `help` | the built-in summary |
+
+Other backslash commands print "not implemented" instead of reaching the server.
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | ok |
+| `1` | SQL or usage error |
+| `2` | TypeSafe API error or a budget guard fired |
+
+## The footer
+
+After a jev statement, the REPL (and `-v`) prints:
+
+```
+jev: 129 judged, 4 req, 82 cache hits, 21.0k in tokens, $0.0009, 1.02s
+```
+
+`judged` counts distinct row-and-question pairs, cache hits included. Cost is estimated at $0.042 per million input tokens from the usage the API reports.

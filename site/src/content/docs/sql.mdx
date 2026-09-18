@@ -1,0 +1,95 @@
+---
+title: SQL surface
+description: Every jev function, its arguments, and where it may appear in a statement.
+section: Use
+order: 10
+---
+
+All functions take a **row source** as their first argument and a **question** as their second.
+
+## Row sources
+
+| Form | Sends |
+|---|---|
+| `jev(people, ...)` | every column of the `people` relation (or alias) in FROM |
+| `jev(p, ...)` | same, for `FROM people p` |
+| `jev((name, bio), ...)` | only those expressions, as a JSON object keyed by column name |
+
+Alias form refuses tables with `bytea` columns unless you narrow the columns with the list form or `--columns name,bio`. NULLs are sent as `null`. Timestamps are RFC 3339 in UTC.
+
+## Functions
+
+| Call | Returns |
+|---|---|
+| `jev(src, 'condition')` | boolean, `p >= threshold` |
+| `jev(src, 'condition', 0.7)` | boolean with an explicit threshold |
+| `jev_prob(src, 'condition')` | float8 in 0..1, the calibrated probability |
+| `jev_choice(src, 'question', ARRAY['a','b'])` | text, the chosen option |
+| `jev_score(src, 'question', ARRAY['lo','mid','hi'])` | float8, weighted index into the levels |
+| `jev_score_norm(src, 'question', ARRAY[...])` | float8 in 0..1 |
+| `jev_confidence(src, 'q' [, 'noul' \| 'choice' \| 'score', ARRAY[...]])` | float8 |
+| `jev_eval(src, 'q' [, kind, ARRAY[...]])` | the raw answer as JSON |
+
+Threshold precedence: explicit third argument, then `--threshold`, then `JEV_THRESHOLD`, then `0.5`.
+
+Calls that share a row source, question and options are judged once. `jev(p, 'x')` and `jev_prob(p, 'x')` in the same statement cost one judgement per row.
+
+## Where a call may appear
+
+**WHERE.** `jev()` as an AND term, including `NOT jev()`:
+
+```sql
+WHERE jev(t, 'is urgent') AND status = 'open'
+WHERE NOT jev(e, 'is a newsletter') AND received > now() - interval '1 day'
+```
+
+**SELECT list.** Any function, as the whole expression, with or without an alias:
+
+```sql
+SELECT subject, jev_choice(t, 'which team?', ARRAY['billing','technical']) AS team FROM tickets t
+```
+
+**ORDER BY.** By alias, position or the expression itself:
+
+```sql
+ORDER BY p DESC        -- alias of jev_prob(...)
+ORDER BY jev_prob(people, 'x')
+```
+
+**GROUP BY.** With `count(*)`, `count(x)`, `sum`, `avg`, `min`, `max`. Aggregation happens in the client, so `sum` and `avg` need numeric columns:
+
+```sql
+SELECT jev_choice(t, 'which team?', ARRAY['billing','technical','sales']) AS team, count(*)
+FROM tickets t
+WHERE status = 'open'
+GROUP BY 1
+ORDER BY 2 DESC;
+```
+
+**Joins.** Judge one or several aliases:
+
+```sql
+SELECT p.name, c.country
+FROM people p JOIN cities c ON c.name = p.city
+WHERE jev(p, 'could work from home') AND c.country = 'PT';
+```
+
+## What is rejected, on purpose
+
+jevql errors with a specific message rather than guessing:
+
+| Statement | Why |
+|---|---|
+| `jev_*` in INSERT, UPDATE, DELETE, DDL | only SELECT is supported |
+| `jev_*` inside a CTE or subquery | run the inner query with jevql instead |
+| `HAVING jev_*(...)`, or any HAVING with jev present | not in v1 |
+| window functions over `jev_*` | not in v1 |
+| `... OR jev(...)` | every row would need judging; split the query |
+| `jev_prob(...) > 0.7` in WHERE | write `jev(src, 'condition', 0.7)` |
+| `round(jev_prob(...), 2)` | jev must be the whole SELECT expression |
+| `SELECT DISTINCT`, UNION, `FETCH ... WITH TIES` | not in v1 |
+| alias-form on a table with `bytea` | narrow the columns first |
+
+## Pushdown rules
+
+`ORDER BY`, `LIMIT` and `OFFSET` are sent to Postgres only when the collected rows are exactly the final rows: no jev predicate in WHERE, no GROUP BY, and no jev sort key. Then `LIMIT 10` judges ten rows. Otherwise they run in the client after judging, and `--max-rows` caps the collected set.

@@ -1,0 +1,65 @@
+---
+import Layout from "@/layouts/main.astro"
+---
+<Layout title="404 · jevql" description="No rows matched that path.">
+  <main class="page nf">
+    <header class="mast">
+      <a class="brand" href="/">jevql</a>
+      <div class="mast-right"><a class="repo-link" href="/docs/">docs</a></div>
+    </header>
+    <section class="nf-wrap">
+      <p class="eyebrow">http 404</p>
+      <h1>Zero rows, <mark>zero regrets.</mark></h1>
+      <pre class="output nf-term" id="nf-term"></pre>
+      <div class="install-cta">
+        <a class="nf-btn" href="/">← back home</a>
+        <a class="nf-btn secondary" href="/docs/">read the docs</a>
+      </div>
+    </section>
+  </main>
+  <script>
+    const path = location.pathname
+    const lines = [
+      `jevql=> SELECT * FROM pages WHERE path = '${path.replace(/'/g, "''")}';`,
+      ` path | title`,
+      `------+-------`,
+      `(0 rows)`,
+      ``,
+      `jevql=> SELECT path FROM pages WHERE jev(pages, 'is what the visitor was looking for');`,
+      `  path`,
+      `--------`,
+      ` /`,
+      ` /docs/`,
+      `(2 rows)`,
+      ``,
+      `jev: 3 judged, 0 req, 3 cache hits, 0 in tokens, $0.0000, 12ms`,
+    ]
+    const el = document.getElementById("nf-term")!
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (reduced) el.textContent = lines.join("\n")
+    else {
+      const text = lines.join("\n")
+      let i = 0
+      el.classList.add("typing")
+      const tick = () => {
+        i++
+        el.textContent = text.slice(0, i)
+        if (i < text.length) setTimeout(tick, text[i - 1] === "\n" ? 60 : 9)
+        else el.classList.remove("typing")
+      }
+      tick()
+    }
+  </script>
+  <style is:global>
+    .nf-wrap { padding: 60px 0 40px; max-width: 760px; }
+    .nf-wrap h1 { margin: 0; font: 900 clamp(2.2rem, 5vw, 4.2rem)/.95 Arial, sans-serif; letter-spacing: -.06em; }
+    .nf-term { margin: 28px 0 0; min-height: 15em; border: 1.5px solid var(--ink); background: var(--panel); box-shadow: 4px 4px 0 var(--ink); padding: 16px; white-space: pre-wrap; }
+    .nf-term.typing::after { content: "▍"; color: var(--pink); animation: blink 1s steps(2) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .install-cta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
+    .nf-btn { display: inline-flex; align-items: center; border: 1.5px solid var(--ink); background: var(--lime); box-shadow: 4px 4px 0 var(--ink); padding: 16px 22px; color: inherit; text-decoration: none; font: 900 .85rem/1 ui-monospace, monospace; }
+    .nf-btn.secondary { background: #fff; }
+    .nf-btn:hover { background: var(--lime); }
+    .nf-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
+  </style>
+</Layout>

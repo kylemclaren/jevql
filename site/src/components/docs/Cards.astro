@@ -1,0 +1,5 @@
+---
+interface Props { columns?: number }
+const { columns = 2 } = Astro.props
+---
+<div class="cards" style={`grid-template-columns: repeat(${columns}, minmax(0, 1fr))`}><slot /></div>

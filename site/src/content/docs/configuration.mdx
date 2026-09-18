@@ -1,0 +1,50 @@
+---
+title: Configuration
+description: Environment variables, the saved config file, the cache, and precedence.
+section: Use
+order: 12
+---
+
+## Precedence
+
+Flags win over environment variables, which win over the saved config file, which wins over built-in defaults.
+
+## Environment variables
+
+| Variable | Used for |
+|---|---|
+| `DATABASE_URL` | connection when no URI, `-h`/`-d` flag or `PG*` variable is given |
+| `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` `PGDATABASE` `PGSSLMODE` | as psql |
+| `TYPESAFE_API_KEY` | the API key |
+| `TYPESAFE_API_URL` | endpoint override, for proxies and gateways |
+| `JEV_THRESHOLD` | default `jev()` threshold |
+| `JEV_MODEL` | model name |
+| `JEVQL_CACHE` | cache file path |
+| `JEVQL_CONFIG` | config file path |
+| `JEVQL_LISTEN` `JEVQL_TOKEN` | defaults for `jevql serve` |
+
+## The config file
+
+`~/.config/jevql/env` holds `KEY=VALUE` lines. jevql writes it (mode `0600`) when you accept the offer on first launch, and reads it at startup, filling in only variables that are not already set.
+
+```
+# jevql defaults; environment variables override these.
+DATABASE_URL=postgres://app:secret@db.internal:5432/app
+TYPESAFE_API_KEY=tsk_...
+```
+
+<Callout kind="warn">
+The file stores the database password and the API key in plain text. Delete it if that is not acceptable and use environment variables or your secret manager instead.
+</Callout>
+
+## The cache
+
+Answers are stored in sqlite at `~/.cache/jevql/cache.db`, keyed by
+
+```
+sha256(model + kind + question + options + canonical_row_json)
+```
+
+Canonical JSON has sorted keys, RFC 3339 timestamps in UTC, no whitespace, and NULL columns as `null`. Two statements that judge the same rows with the same question share answers even if the SQL around them differs.
+
+There is no expiry. `\cache clear` empties it, `--no-cache` bypasses it, `\cache` shows its size. The file is created with mode `0600` and holds row hashes and answers, not row contents.

@@ -195,21 +195,53 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
 ## SDKs
 
 The parser, rewriter, cache and TypeSafe client live in this Go module. Every
-SDK reuses them rather than re-implementing SQL analysis:
+SDK reuses them rather than re-implementing SQL analysis. The wire format
+shared by `jevql serve`, `jevql --json-table` and the SDKs is in `sdk/PROTOCOL.md`.
 
-- **Go** (`sdk/go`, package `github.com/kylemclaren/jevql/sdk/go`): in-process.
-  `jevql.New(ctx, jevql.Options{DatabaseURL: ...})`, then `Query`, `QueryMaps`, `Explain`.
-- **TypeScript** (`sdk/typescript`, npm `jevql`) and **Python** (`sdk/python`,
-  PyPI `jevql`): thin clients with two transports, a long-running
-  `jevql serve` over HTTP on localhost, or spawning `jevql --json-table` per
-  call. Both have zero runtime dependencies.
+### Go (in process)
 
-The wire format shared by `jevql serve`, `jevql --json-table` and the SDKs is
-documented in `sdk/PROTOCOL.md`.
+```go
+import jevql "github.com/kylemclaren/jevql/sdk/go"
+
+client, err := jevql.New(ctx, jevql.Options{DatabaseURL: os.Getenv("DATABASE_URL")})
+defer client.Close(ctx)
+
+rows, err := client.QueryMaps(ctx,
+    "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5")
+for _, r := range rows {
+    fmt.Println(r["name"], r["p"])
+}
+```
+
+### TypeScript (`npm i jevql`)
+
+```ts
+import { Jevql } from "jevql"
+
+const db = new Jevql({ url: "http://127.0.0.1:7433", token: process.env.JEVQL_TOKEN }) // jevql serve
+// or: new Jevql({ cli: { databaseUrl: process.env.DATABASE_URL } })            // spawns the binary
+
+const tickets = await db.queryObjects(
+  "SELECT id, subject FROM tickets WHERE jev(tickets, 'is about billing') AND status = 'open'",
+)
+```
+
+### Python (`pip install jevql`)
+
+```python
+from jevql import Jevql
+
+db = Jevql(url="http://127.0.0.1:7433", token=os.environ["JEVQL_TOKEN"])   # jevql serve
+# or: Jevql.cli(database_url=os.environ["DATABASE_URL"])                    # spawns the binary
+
+for row in db.query_dicts("SELECT title FROM movies WHERE jev(movies, 'a safe pick for a first date')"):
+    print(row["title"])
+```
+
+Start the server the TypeScript and Python HTTP transports use with:
 
 ```bash
-jevql serve --listen 127.0.0.1:7433 --token secret   # for the TS/Python HTTP transport
-jevql --json-table -c "SELECT 1"                      # one JSON document per statement
+jevql serve --listen 127.0.0.1:7433 --token secret
 ```
 
 ## Development

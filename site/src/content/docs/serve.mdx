@@ -1,0 +1,71 @@
+---
+title: jevql serve and the protocol
+description: The local HTTP transport the SDKs use, and the JSON documents it speaks.
+section: Integrate
+order: 20
+---
+
+`jevql serve` runs the same executor as the CLI behind a tiny JSON API on localhost. The TypeScript and Python SDKs use it for long-running processes: one connection, one warm cache.
+
+```bash
+jevql serve --listen 127.0.0.1:7433 --token secret
+```
+
+Connection and TypeSafe settings come from the usual flags, environment variables and config file. `--token` (or `JEVQL_TOKEN`) requires `Authorization: Bearer <token>` on every request.
+
+<Callout kind="warn">
+It is meant for localhost. It does not speak TLS and it has one bearer token. Put a real proxy in front of it before exposing it anywhere else.
+</Callout>
+
+## Endpoints
+
+`GET /v1/health`
+
+```json
+{"ok": true, "version": "0.1.0", "model": "jev-latest"}
+```
+
+`POST /v1/query`
+
+```json
+{"sql": "SELECT name FROM people WHERE jev(people, 'could work from home')", "threshold": 0.7, "explain": false, "max_rows": 500}
+```
+
+Only `sql` is required. `threshold` and `max_rows` override the server defaults for that request. `explain: true` returns the plan without calling TypeSafe.
+
+## QueryResult
+
+```json
+{
+  "columns": ["name", "p"],
+  "rows": [["Ada Fernandes", 0.93], ["Miguel Costa", 0.94]],
+  "row_count": 2,
+  "tag": "SELECT 2",
+  "jev": true,
+  "stats": {"collect_rows": 6, "judged": 6, "requests": 1, "cache_hits": 0, "input_tokens": 1200, "output_tokens": 40, "usd": 0.00005, "elapsed_ms": 1350},
+  "explain": null
+}
+```
+
+`tag` is the Postgres command tag, so row-less statements return `INSERT 0 1` or `CREATE TABLE` with empty `columns`. `stats` is `null` for plain SQL. Values use the same canonical encoding as the cache: numbers as numbers, timestamps as RFC 3339 strings, `bytea` as base64, json columns as nested JSON.
+
+## Errors
+
+```json
+{"error": "relation \"nope\" does not exist", "code": "sql"}
+```
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `sql` | parse, rewrite or Postgres error |
+| 402 | `budget` | `--max-rows` or `--max-chars` fired; nothing was sent to TypeSafe |
+| 502 | `api` | TypeSafe returned an error |
+| 401 | `auth` | bad or missing bearer token |
+
+## The same documents from the CLI
+
+```bash
+jevql --json-table -c "SELECT 1; SELECT name FROM people WHERE jev(people, 'x')"
+```
+
+prints one QueryResult per statement, one per line. Errors go to stderr as text, with exit code `1` for SQL and `2` for API or budget errors. The SDKs' CLI transport wraps exactly this, which is handy for scripts and notebooks where you do not want a server.

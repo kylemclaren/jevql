@@ -5,6 +5,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+    --color-ink: #171715;
+    --color-ink-2: #45443f;
+    --color-ink-3: #66645e;
+    --color-paper: #f7f6f0;
+    --color-panel: #fffefa;
+    --color-line: #c7c5bb;
+    --color-hover-2: #ecebe4;
+    --color-field: #ffffff;
+    --color-lime: #d4ff3f;
+    --color-pink: #ee5ba6;
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Inter Variable', sans-serif;

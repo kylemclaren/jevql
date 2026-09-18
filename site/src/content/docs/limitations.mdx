@@ -1,0 +1,29 @@
+---
+title: Limitations and roadmap
+description: What v1 declines to do, and what is likely next.
+section: Reference
+order: 31
+---
+
+## Not in v1
+
+- `jev_*` in CTEs, subqueries, HAVING, window functions, DISTINCT, set operations.
+- `OR jev(...)`. Split the query, or rewrite as `jev()` with a broader condition.
+- Comparing probabilities in WHERE. Use `jev(src, 'condition', 0.7)`.
+- Aggregates other than `count`, `sum`, `avg`, `min`, `max` alongside jev.
+- `FETCH FIRST ... WITH TIES`, `FOR UPDATE`.
+- Judging a subquery or CTE alias. The source must be a base table in FROM.
+- Cache expiry. Clear it by hand.
+
+## Known rough edges
+
+- Column-list form needs two or more columns. `jev((name), ...)` parses as a plain column reference; write `ROW(name)`.
+- `GROUP BY` output ordering follows first appearance unless you add `ORDER BY`.
+- The macOS Intel binary is built on GitHub's Intel runners; report anything odd.
+
+## Likely next
+
+- Expiry and size limits for the cache.
+- `OR jev(...)` by judging the union and filtering in the client, behind an explicit flag because of cost.
+- Streaming results for `jevql serve`.
+- A Postgres wire proxy, so unmodified applications can send `WHERE jev(...)`. Deliberately not in this repository yet.

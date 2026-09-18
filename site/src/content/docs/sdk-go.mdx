@@ -1,0 +1,75 @@
+---
+title: Go SDK
+description: Run jev-enabled SQL in process from Go, using the same engine as the CLI.
+section: Integrate
+order: 21
+---
+
+The Go SDK is the engine itself. It imports the parser, rewriter, cache and TypeSafe client from the module, so there is no server and no subprocess.
+
+```bash
+go get github.com/kylemclaren/jevql/sdk/go
+```
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	jevql "github.com/kylemclaren/jevql/sdk/go"
+)
+
+func main() {
+	ctx := context.Background()
+	client, err := jevql.New(ctx, jevql.Options{
+		DatabaseURL: os.Getenv("DATABASE_URL"), // or Conn: an existing *pgx.Conn
+		APIKey:      os.Getenv("TYPESAFE_API_KEY"),
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer client.Close(ctx)
+
+	rows, err := client.QueryMaps(ctx,
+		"SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5")
+	if err != nil {
+		panic(err)
+	}
+	for _, r := range rows {
+		fmt.Println(r["name"], r["p"])
+	}
+}
+```
+
+## API
+
+| | |
+|---|---|
+| `New(ctx, Options)` | connects (or wraps `Options.Conn`) and opens the cache |
+| `Query(ctx, sql, opts...)` | returns `*Result` with `Columns`, `Rows [][]any`, `Tag`, `Jev`, `Stats` |
+| `QueryMaps(ctx, sql, opts...)` | rows as `[]map[string]any` |
+| `Explain(ctx, sql)` | the plan and cost estimate; no TypeSafe calls |
+| `CacheClear(ctx)` | empties the answer cache |
+| `Close(ctx)` | closes the cache and the connection if the client opened it |
+
+`QueryOptions{Threshold: &t, MaxRows: &n}` overrides per call. `Options` mirrors the CLI flags: `Model`, `Threshold`, `BatchSize`, `Concurrency`, `MaxRows`, `MaxChars`, `Columns`, `CachePath`, `NoCache`, `Logf`. Unset fields fall back to `DATABASE_URL`, `TYPESAFE_API_KEY`, `TYPESAFE_API_URL` and `JEV_THRESHOLD`, then to the CLI defaults.
+
+## Errors
+
+Failures are `*jevql.Error` with a `Code` of `sql`, `budget` or `api`, wrapping the underlying error:
+
+```go
+var je *jevql.Error
+if errors.As(err, &je) && je.Code == "budget" {
+	// raise MaxRows or narrow the query
+}
+```
+
+## Notes
+
+- A client serialises calls on its connection. Create one per goroutine, or share one and accept the serialisation.
+- Because the SDK links libpg_query, building needs CGO and a C compiler, the same as the CLI.
+- Values in `Rows` are JSON-friendly: `int64`/`float64`, `string`, `bool`, `nil`, RFC 3339 strings for timestamps.

@@ -1,0 +1,10 @@
+---
+interface Props { title: string; href?: string; eyebrow?: string }
+const { title, href, eyebrow } = Astro.props
+const Tag = href ? "a" : "div"
+---
+<Tag class="card" href={href}>
+  {eyebrow && <small>{eyebrow}</small>}
+  <strong>{title}</strong>
+  <span><slot /></span>
+</Tag>

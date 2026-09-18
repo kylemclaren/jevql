@@ -1,0 +1,65 @@
+---
+title: TypeScript SDK
+description: A zero-dependency client for Node and Bun over jevql serve or the CLI.
+section: Integrate
+order: 22
+---
+
+```bash
+npm i jevql
+```
+
+The package has no runtime dependencies and needs Node 18+ or Bun. It talks to the Go binary, so install that first ([Install](/docs/install/)).
+
+## HTTP transport
+
+Start a server once:
+
+```bash
+jevql serve --listen 127.0.0.1:7433 --token secret
+```
+
+```ts
+import { Jevql } from "jevql"
+
+const db = new Jevql({ url: "http://127.0.0.1:7433", token: "secret" })
+
+const res = await db.query(
+  "SELECT name, jev_prob(people, 'could work from home') AS p FROM people WHERE country = 'PT' ORDER BY p DESC LIMIT 5",
+  { threshold: 0.6 },
+)
+res.columns  // ["name", "p"]
+res.rows     // [["Miguel Costa", 0.94], ...]
+res.stats    // { judged: 6, requests: 1, cache_hits: 0, usd: 0.00005, ... }
+
+const tickets = await db.queryObjects("SELECT * FROM tickets WHERE jev(tickets, 'is about billing')")
+// [{ id: 1, subject: "Charged twice", ... }]
+
+const plan = await db.explain("SELECT * FROM people WHERE jev(people, 'x')")
+```
+
+## CLI transport
+
+No server, one process per call. Fine for scripts and notebooks:
+
+```ts
+const db = new Jevql({ cli: { binary: "jevql", databaseUrl: process.env.DATABASE_URL, apiKey: process.env.TYPESAFE_API_KEY } })
+const rows = await db.queryObjects("SELECT 1 AS one")
+```
+
+## Errors
+
+Every failure is a `JevqlError` with `code` (`sql`, `budget`, `api`, `auth`, `internal`, `transport`) and, for HTTP, `status`:
+
+```ts
+import { JevqlError } from "jevql"
+try {
+  await db.query("SELECT * FROM nope")
+} catch (e) {
+  if (e instanceof JevqlError && e.code === "sql") console.error(e.message)
+}
+```
+
+## Types
+
+`QueryResult`, `Stats`, `Explain`, `JevqlOptions` are exported. `rows` is `unknown[][]`; `queryObjects` returns `Record<string, unknown>[]`.
