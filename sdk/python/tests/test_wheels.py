@@ -41,9 +41,9 @@ def test_build_wheel_for_platform(tmp_path, key, tag):
     made = build_wheels.main(["--version", "9.9.9", "--tarballs", str(tarballs), "--out", str(out), "--only", key])
     assert len(made) == 1
     whl = made[0]
-    assert whl.name.startswith("jevql-0.2.0-py3-none-") and whl.name.endswith(".whl")
+    assert whl.name.startswith(f"jevql-{__version__}-py3-none-") and whl.name.endswith(".whl")
     # compressed tag sets are order-insensitive
-    assert set(whl.name[len("jevql-0.2.0-py3-none-"):-len(".whl")].split(".")) == set(tag.split("."))
+    assert set(whl.name[len(f"jevql-{__version__}-py3-none-"):-len(".whl")].split(".")) == set(tag.split("."))
     with zipfile.ZipFile(whl) as z:
         names = z.namelist()
         assert "jevql/_engine/jevql" in names
@@ -65,4 +65,4 @@ def test_missing_tarballs_fail(tmp_path):
 def test_source_install_without_binary_imports():
     out = subprocess.run([sys.executable, "-c", "import jevql; print(jevql.__version__)"],
                          capture_output=True, text=True, cwd=ROOT, env={"PYTHONPATH": str(ROOT / "src"), "PATH": ""})
-    assert out.returncode == 0 and out.stdout.strip() == "0.2.0"
+    assert out.returncode == 0 and out.stdout.strip() == __version__
