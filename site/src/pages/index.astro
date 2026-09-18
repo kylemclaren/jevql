@@ -11,7 +11,7 @@ const install = "brew install kylemclaren/tap/jevql"
       <a class="brand" href="./">jevql</a>
       <div class="mast-right">
         <span class="tagline">Semantic SQL for vanilla Postgres</span>
-        <a class="repo-link" href={repo} aria-label="GitHub repository">
+        <a class="repo-link" href={repo} target="_blank" rel="noopener" aria-label="GitHub repository (opens in a new tab)">
           <svg class="gh" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
           GitHub
         </a>
@@ -19,11 +19,10 @@ const install = "brew install kylemclaren/tap/jevql"
     </header>
 
     <section class="hero">
-      <p class="eyebrow">A psql-shaped CLI · no Postgres extension required</p>
       <h1>Ask your database <mark>a real question.</mark></h1>
       <p class="lede">
-        Put <code>jev(people, 'could work from home')</code> in a WHERE clause. Postgres runs the SQL,
-        Jev judges the rows, you get a psql table. No extension to install: the server only sees plain SQL.
+        A psql-shaped CLI. Put <code>jev(people, 'could work from home')</code> in a WHERE clause: Postgres runs the SQL,
+        Jev judges the rows, you get a psql table. No extension to install, the server only sees plain SQL.
       </p>
       <div class="install-cta">
         <button id="download" type="button">
@@ -101,7 +100,7 @@ const install = "brew install kylemclaren/tap/jevql"
     <section class="machine" aria-labelledby="functions-title">
       <div class="section-head">
         <div><p class="eyebrow">functions</p><h2 id="functions-title">Same names as pg-jev</h2></div>
-        <a class="repo-link" href={`${repo}#sql-surface`}>full surface ↗</a>
+        <a class="repo-link" href={`${repo}#sql-surface`} target="_blank" rel="noopener">full surface ↗</a>
       </div>
       <div class="phases" aria-label="Functions">
         <div class="phase"><small>boolean</small><strong>jev()</strong><span><code>jev(p, 'condition' [, 0.7])</code><br />A calibrated probability against a threshold. Works in WHERE, also as <code>NOT jev()</code>.</span></div>
@@ -114,7 +113,7 @@ const install = "brew install kylemclaren/tap/jevql"
     <section class="machine" aria-labelledby="install-title">
       <div class="section-head">
         <div><p class="eyebrow">install</p><h2 id="install-title">One binary, then just type <code>jevql</code></h2></div>
-        <a class="repo-link" href={`${repo}/releases`}>releases ↗</a>
+        <a class="repo-link" href={`${repo}/releases`} target="_blank" rel="noopener">releases ↗</a>
       </div>
       <div class="phases" aria-label="Install options">
         <div class="phase"><small>shell</small><pre class="output" id="curl-line-2">curl -fsSL …/install.sh | sh</pre></div>
@@ -136,7 +135,7 @@ const install = "brew install kylemclaren/tap/jevql"
 
     <footer>
       <span>jevQL · MIT</span>
-      <span><a href={repo}>GitHub</a> · <a href="https://typesafe.ai">TypeSafe</a> · <a href="https://github.com/realZachi/pg-jev">pg-jev</a> · styled after <a href="https://github.com/TheoLeeCJ/openjev">openjev</a></span>
+      <span><a href={repo} target="_blank" rel="noopener">GitHub</a> · <a href="https://typesafe.ai">TypeSafe</a> · <a href="https://github.com/realZachi/pg-jev">pg-jev</a> · styled after <a href="https://github.com/TheoLeeCJ/openjev">openjev</a></span>
     </footer>
   </main>
 
