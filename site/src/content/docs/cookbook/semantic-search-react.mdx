@@ -223,7 +223,12 @@ The component ships without styles so it drops into whatever you have. If you wa
 - **Do not search on every keystroke.** Submit on Enter or after a long debounce. Each distinct condition is a new set of judgements.
 - **Show the bill.** The `stats` object is free; surfacing it keeps you honest with yourself about what a feature costs.
 
-## 5. Same thing with Express
+## 5. The same route in Express, Python and Go
+
+The route is small enough to carry to any stack. Each version below was run against the demo store; all three answer the same JSON, and all three refuse to judge more than 500 rows.
+
+<Tabs labels={["Express", "Python", "Go"]} storageKey="sdk">
+<div>
 
 ```ts
 import express from "express"
@@ -255,6 +260,117 @@ ORDER BY relevance DESC LIMIT 20`
 
 app.listen(3000)
 ```
+
+</div>
+<div>
+
+```python
+# api.py: FastAPI route in front of jevql
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+from dataclasses import asdict
+from jevql import Jevql, JevqlError
+
+app = FastAPI()
+db = Jevql()   # one engine per process; reads DATABASE_URL and TYPESAFE_API_KEY
+
+class Search(BaseModel):
+    condition: str = Field(min_length=3, max_length=200)
+    limit: int = Field(default=20, le=50)
+
+@app.post("/api/search")
+def search(s: Search):
+    q = s.condition.replace("'", "''")   # the condition is a SQL string literal
+    sql = f"""
+    SELECT id, subject, jev_prob((t.subject, t.body), '{q}') AS relevance
+    FROM tickets t
+    WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
+      AND jev((t.subject, t.body), '{q}')
+    ORDER BY relevance DESC
+    LIMIT {s.limit}"""
+    try:
+        res = db.query(sql, max_rows=500)   # never judge more than 500 rows per search
+    except JevqlError as e:
+        if e.code == "budget":
+            raise HTTPException(422, "Too many matching rows to search. Add a filter.")
+        raise
+    return {"columns": res.columns, "rows": res.rows, "stats": asdict(res.stats), "sql": sql}
+```
+
+FastAPI turns the `Field` limits into a `422` before the handler runs, so a two-letter condition never reaches jevql. Run it with `uvicorn api:app`.
+
+</div>
+<div>
+
+```go
+// main.go: net/http route in front of jevql
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+
+	jevql "github.com/kylemclaren/jevql/sdk/go"
+)
+
+func main() {
+	ctx := context.Background()
+	db, err := jevql.New(ctx, jevql.Options{DatabaseURL: os.Getenv("DATABASE_URL"), APIKey: os.Getenv("TYPESAFE_API_KEY")})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close(ctx)
+
+	http.HandleFunc("POST /api/search", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Condition string `json:"condition"`
+			Limit     int    `json:"limit"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil || len(in.Condition) < 3 || len(in.Condition) > 200 {
+			http.Error(w, `{"error":"bad request"}`, http.StatusBadRequest)
+			return
+		}
+		if in.Limit <= 0 || in.Limit > 50 {
+			in.Limit = 20
+		}
+		q := strings.ReplaceAll(in.Condition, "'", "''") // the condition is a SQL string literal
+		sql := fmt.Sprintf(`SELECT id, subject, jev_prob((t.subject, t.body), '%s') AS relevance
+FROM tickets t
+WHERE t.status = 'open' AND t.created_at > now() - interval '90 days'
+  AND jev((t.subject, t.body), '%s')
+ORDER BY relevance DESC LIMIT %d`, q, q, in.Limit)
+
+		maxRows := 500 // never judge more than 500 rows per search
+		res, err := db.Query(r.Context(), sql, jevql.QueryOptions{MaxRows: &maxRows})
+		w.Header().Set("Content-Type", "application/json")
+		var je *jevql.Error
+		if errors.As(err, &je) && je.Code == "budget" {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Too many matching rows to search. Add a filter."})
+			return
+		}
+		if err != nil {
+			log.Println(err)
+			w.WriteHeader(http.StatusBadGateway)
+			json.NewEncoder(w).Encode(map[string]string{"error": "Search is unavailable right now. Try again."})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"columns": res.Columns, "rows": res.Rows, "stats": res.Stats, "sql": sql})
+	})
+	log.Fatal(http.ListenAndServe(":3000", nil))
+}
+```
+
+The Go SDK is the engine itself, in process: no subprocess, no server. It needs CGO for the parser, the same as building the CLI.
+
+</div>
+</Tabs>
 
 ## Where to go next
 

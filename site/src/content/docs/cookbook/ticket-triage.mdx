@@ -17,7 +17,7 @@ tickets(id, customer_id, subject, body, status, priority, created_at, expected_t
 
 ## What you need
 
-- The [CLI](/docs/install/) for the exploration steps, and `pip install jevql psycopg[binary]` for the job.
+- The [CLI](/docs/install/) for the exploration steps. For the job, the SDK in your language: `pip install jevql psycopg[binary]`, `npm i jevql pg`, or `go get github.com/kylemclaren/jevql/sdk/go`.
 - `DATABASE_URL` and `TYPESAFE_API_KEY` in the environment.
 - A tickets table with a subject and a body. Any names work; the column-list form below names them explicitly.
 
@@ -171,7 +171,7 @@ Ticket 1795 is a customer asking for the third time, filed as *low*. Ticket 876 
 
 ## 5. Ship it as a job
 
-Both answers in one query, written to a routes table, on a schedule. The job uses the Python SDK for the judged query and plain psycopg for the write, so jevql only ever needs a read-only role.
+Both answers in one query, written to a routes table, on a schedule. The job uses the SDK for the judged query and your usual Postgres driver for the write, so jevql only ever needs a read-only role. Pick your language; all three were run against the demo store.
 
 ```sql
 CREATE TABLE ticket_routes (
@@ -181,6 +181,9 @@ CREATE TABLE ticket_routes (
   routed_at  timestamptz NOT NULL DEFAULT now()
 );
 ```
+
+<Tabs labels={["Python", "TypeScript", "Go"]} storageKey="sdk">
+<div>
 
 ```python
 # triage.py: route open tickets to a team and rank them by urgency.
@@ -233,6 +236,139 @@ $ python triage.py
 35 tickets routed; 64 judged, 64 from cache, $0.0000
 ```
 
+</div>
+<div>
+
+```ts
+// triage.ts: route open tickets to a team and rank them by urgency.
+import { Jevql } from "jevql"
+import pg from "pg"
+
+const TEAMS = ["billing", "technical", "shipping", "sales", "product", "legal", "security"]
+const ROUTE = [
+  "Which team should handle this ticket?",
+  "billing: charges, refunds, invoices, subscriptions and cancellations.",
+  "technical: bugs, outages, logins, API, webhooks, accessibility and broken devices.",
+  "shipping: delivery, tracking, wrong or late items, shipping destinations.",
+  "sales: pricing, quotes, seats, discounts, bulk orders.",
+  "product: feature requests, praise, sizing and product questions.",
+  "legal: data export, privacy, contracts.",
+  "security: vulnerabilities, suspicious activity.",
+].join(" ")
+const URGENCY = ["low", "normal", "high", "urgent"]
+const arr = (xs: string[]) => `ARRAY[${xs.map((x) => `'${x}'`).join(", ")}]`
+
+const SQL = `
+SELECT id,
+       jev_choice((subject, body), '${ROUTE}', ${arr(TEAMS)}) AS team,
+       jev_score((subject, body), 'How urgent is this ticket?', ${arr(URGENCY)}) AS urgency
+FROM tickets
+WHERE status = 'open' AND created_at > now() - interval '7 days'`
+
+const UPSERT = `
+INSERT INTO ticket_routes (ticket_id, team, urgency) VALUES ($1, $2, $3)
+ON CONFLICT (ticket_id) DO UPDATE SET team = EXCLUDED.team, urgency = EXCLUDED.urgency, routed_at = now()`
+
+const db = new Jevql()
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL })
+const res = await db.query(SQL)     // Postgres filters, Jev judges, rows come back
+for (const [id, team, urgency] of res.rows) await pool.query(UPSERT, [id, team, urgency])
+const s = res.stats
+console.log(`${res.row_count} tickets routed; ${s.judged} judged, ${s.cache_hits} from cache, $${s.usd.toFixed(4)}`)
+await db.close()
+await pool.end()
+```
+
+```
+$ bun run triage.ts        # or: npx tsx triage.ts
+35 tickets routed; 64 judged, 0 from cache, $0.0004
+$ bun run triage.ts
+35 tickets routed; 64 judged, 64 from cache, $0.0000
+```
+
+The engine and `pg` both read `DATABASE_URL`; `pg.Pool` needs it passed explicitly.
+
+</div>
+<div>
+
+```go
+// triage.go: route open tickets to a team and rank them by urgency.
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+
+	"github.com/jackc/pgx/v5"
+	jevql "github.com/kylemclaren/jevql/sdk/go"
+)
+
+var teams = []string{"billing", "technical", "shipping", "sales", "product", "legal", "security"}
+
+const route = "Which team should handle this ticket? " +
+	"billing: charges, refunds, invoices, subscriptions and cancellations. " +
+	"technical: bugs, outages, logins, API, webhooks, accessibility and broken devices. " +
+	"shipping: delivery, tracking, wrong or late items, shipping destinations. " +
+	"sales: pricing, quotes, seats, discounts, bulk orders. " +
+	"product: feature requests, praise, sizing and product questions. " +
+	"legal: data export, privacy, contracts. " +
+	"security: vulnerabilities, suspicious activity."
+
+var urgency = []string{"low", "normal", "high", "urgent"}
+
+func arr(xs []string) string { return "ARRAY['" + strings.Join(xs, "', '") + "']" }
+
+func main() {
+	ctx := context.Background()
+	pg, err := pgx.Connect(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pg.Close(ctx)
+
+	db, err := jevql.New(ctx, jevql.Options{Conn: pg}) // judge over the same connection
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close(ctx)
+
+	sql := fmt.Sprintf(`SELECT id,
+       jev_choice((subject, body), '%s', %s) AS team,
+       jev_score((subject, body), 'How urgent is this ticket?', %s) AS urgency
+FROM tickets
+WHERE status = 'open' AND created_at > now() - interval '7 days'`, route, arr(teams), arr(urgency))
+
+	res, err := db.Query(ctx, sql) // Postgres filters, Jev judges, rows come back
+	if err != nil {
+		log.Fatal(err)
+	}
+	const upsert = `INSERT INTO ticket_routes (ticket_id, team, urgency) VALUES ($1, $2, $3)
+ON CONFLICT (ticket_id) DO UPDATE SET team = EXCLUDED.team, urgency = EXCLUDED.urgency, routed_at = now()`
+	for _, r := range res.Rows { // [id, team, urgency]
+		if _, err := pg.Exec(ctx, upsert, r[0], r[1], r[2]); err != nil {
+			log.Fatal(err)
+		}
+	}
+	s := res.Stats
+	fmt.Printf("%d tickets routed; %d judged, %d from cache, $%.4f\n", len(res.Rows), s.Judged, s.CacheHits, s.USD)
+}
+```
+
+```
+$ go run .
+35 tickets routed; 64 judged, 0 from cache, $0.0004
+$ go run .
+35 tickets routed; 64 judged, 64 from cache, $0.0000
+```
+
+The Go SDK runs in process and can judge over the connection you already hold, so the job needs one Postgres connection, not two.
+
+</div>
+</Tabs>
+
 The second run is free. The cache key is the question, the options and the row content, so a ticket is only judged again if its text changes. Widen the window to a month and the job still only pays for tickets it has not seen. Put it in cron, or in whatever runs your nightly jobs, and the routes table is always a few minutes behind the queue.
 
 Support staff query `ticket_routes` like any other table:
@@ -248,6 +384,9 @@ ORDER BY r.urgency DESC;
 
 The same routing works on a ticket that is not in Postgres yet, for example inside the webhook that receives it. `judge()` takes rows you already hold, uses the same cache, and returns the answer with its probabilities:
 
+<Tabs labels={["Python", "TypeScript", "Go"]} storageKey="sdk">
+<div>
+
 ```python
 ticket = {"subject": "Someone else's parcel arrived",
           "body": "I got a box addressed to a different customer and my own order is missing. Order 4411."}
@@ -259,6 +398,39 @@ r.answers[0].probabilities   # {"shipping": 1, "billing": 0, ...}
 u = db.judge("How urgent is this ticket?", [ticket], kind="score", options=URGENCY)
 u.answers[0].score           # 1.71, between normal and high
 ```
+
+</div>
+<div>
+
+```ts
+const ticket = { subject: "Someone else's parcel arrived",
+                 body: "I got a box addressed to a different customer and my own order is missing. Order 4411." }
+
+const r = await db.judge({ question: ROUTE, kind: "choice", options: TEAMS, rows: [ticket] })
+r.answers[0].choice          // "shipping"
+r.answers[0].probabilities   // { shipping: 1, billing: 0, ... }
+
+const u = await db.judge({ question: "How urgent is this ticket?", kind: "score", options: URGENCY, rows: [ticket] })
+u.answers[0].score           // 1.71, between normal and high
+```
+
+</div>
+<div>
+
+```go
+ticket := map[string]any{"subject": "Someone else's parcel arrived",
+	"body": "I got a box addressed to a different customer and my own order is missing. Order 4411."}
+
+r, err := db.Judge(ctx, jevql.JudgeRequest{Question: route, Kind: "choice", Options: teams, Rows: []map[string]any{ticket}})
+r.Answers[0].Choice          // "shipping"
+r.Answers[0].Probabilities   // map[shipping:1 billing:0 ...]
+
+u, err := db.Judge(ctx, jevql.JudgeRequest{Question: "How urgent is this ticket?", Kind: "score", Options: urgency, Rows: []map[string]any{ticket}})
+*u.Answers[0].Score          // 1.71, between normal and high
+```
+
+</div>
+</Tabs>
 
 Same questions, same options, so the intake path and the nightly job agree with each other and share one cache.
 
