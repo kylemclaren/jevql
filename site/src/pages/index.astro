@@ -19,21 +19,40 @@ const install = "brew install kylemclaren/tap/jevql"
     </header>
 
     <section class="hero">
-      <p class="eyebrow">A psql-shaped CLI</p>
+      <p class="eyebrow">A psql-shaped CLI · no Postgres extension required</p>
       <h1>Ask your database <mark>a real question.</mark></h1>
       <p class="lede">
         Write <code>WHERE jev(people, 'could work from home')</code>. jevql runs the SQL on Postgres,
-        judges the rows with TypeSafe's Jev model, and prints a psql table. The server only ever sees plain SQL.
+        judges the rows with TypeSafe's Jev model, and prints a psql table. Nothing to install on the server,
+no <code>CREATE EXTENSION</code>, nothing to ask your DBA for: Postgres only ever sees plain SQL.
       </p>
       <div class="truth-strip">
-        <span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
+        <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
       </div>
       <div class="install-cta">
-        <button id="copy-install" type="button" data-copy={install}>
+        <button id="download" type="button">
+          <span class="material-symbols-rounded" aria-hidden="true">download</span> download jevql
+        </button>
+        <button id="copy-install" class="secondary" type="button" data-copy={install}>
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
       </div>
     </section>
+
+    <dialog id="dl" aria-labelledby="dl-title">
+      <div class="dl-head">
+        <div><p class="eyebrow">download</p><h2 id="dl-title">Pick your platform</h2></div>
+        <button id="dl-close" class="secondary" type="button" aria-label="Close">✕</button>
+      </div>
+      <p class="dl-version">latest release: <strong id="dl-tag">…</strong></p>
+      <div class="dl-grid" id="dl-grid">
+        <a data-os="darwin" data-arch="arm64" href={`${repo}/releases/latest`}><small>macOS</small><strong>Apple Silicon</strong><span>arm64</span></a>
+        <a data-os="darwin" data-arch="amd64" href={`${repo}/releases/latest`}><small>macOS</small><strong>Intel</strong><span>x86_64</span></a>
+        <a data-os="linux" data-arch="amd64" href={`${repo}/releases/latest`}><small>Linux</small><strong>x86_64</strong><span>amd64</span></a>
+        <a data-os="linux" data-arch="arm64" href={`${repo}/releases/latest`}><small>Linux</small><strong>ARM</strong><span>arm64</span></a>
+      </div>
+      <p class="fine">Tarball with the <code>jevql</code> binary. Unpack it somewhere on your PATH. Checksums are on the <a href={`${repo}/releases/latest`}>release page</a>. Or <code>brew install kylemclaren/tap/jevql</code>.</p>
+    </dialog>
 
     <section class="race" aria-label="Example query and result">
       <article class="lane direct">
@@ -112,6 +131,40 @@ Linux amd64 · arm64</pre></div>
   </main>
 
   <script>
+    const dl = document.getElementById("dl") as HTMLDialogElement | null
+    const open = document.getElementById("download")
+    const close = document.getElementById("dl-close")
+    const tagEl = document.getElementById("dl-tag")
+    const repo = "https://github.com/kylemclaren/jevql"
+    let loaded = false
+    async function loadRelease() {
+      if (loaded) return
+      loaded = true
+      try {
+        const r = await fetch("https://api.github.com/repos/kylemclaren/jevql/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
+        if (!r.ok) throw new Error(String(r.status))
+        const rel = await r.json()
+        const tag: string = rel.tag_name
+        const ver = tag.replace(/^v/, "")
+        if (tagEl) tagEl.textContent = tag
+        for (const a of document.querySelectorAll<HTMLAnchorElement>("#dl-grid a")) {
+          const name = `jevql_${ver}_${a.dataset.os}_${a.dataset.arch}.tar.gz`
+          const asset = (rel.assets || []).find((x: { name: string }) => x.name === name)
+          a.href = asset ? asset.browser_download_url : `${repo}/releases/download/${tag}/${name}`
+        }
+      } catch {
+        if (tagEl) tagEl.textContent = "see releases page"
+      }
+    }
+    // Preselect the visitor's platform.
+    const ua = navigator.userAgent
+    const guessOS = /Mac/i.test(ua) ? "darwin" : /Linux/i.test(ua) ? "linux" : ""
+    const guessArch = /arm64|aarch64/i.test(ua) ? "arm64" : "amd64"
+    document.querySelector(`#dl-grid a[data-os="${guessOS}"][data-arch="${guessArch}"]`)?.classList.add("likely")
+    open?.addEventListener("click", () => { loadRelease(); dl?.showModal() })
+    close?.addEventListener("click", () => dl?.close())
+    dl?.addEventListener("click", (e) => { if (e.target === dl) dl.close() })
+
     const btn = document.getElementById("copy-install")
     if (btn) {
       const original = btn.innerHTML
@@ -129,8 +182,24 @@ Linux amd64 · arm64</pre></div>
 <style is:global>
   code { font: inherit; font-family: ui-monospace, monospace; font-weight: 800; }
   .lede code { font-size: .9em; }
-  .install-cta { margin-top: 22px; }
+  .install-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
   .install-cta button { text-transform: none; }
+  button.secondary { background: #fff; }
+  button.secondary:hover { background: var(--lime); }
+  dialog { width: min(560px, calc(100% - 28px)); border: 1.5px solid var(--ink); border-radius: 0; background: var(--panel); color: var(--ink); padding: 22px; box-shadow: 6px 6px 0 var(--ink); font-family: ui-monospace, monospace; }
+  dialog::backdrop { background: rgba(23, 23, 21, .55); }
+  .dl-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  .dl-head h2 { margin: 0; font: 900 1.6rem/1 Arial, sans-serif; letter-spacing: -.045em; }
+  .dl-head button { padding: 8px 10px; box-shadow: 2px 2px 0 var(--ink); }
+  .dl-version { margin: 12px 0 0; font-size: .68rem; font-weight: 800; text-transform: uppercase; }
+  .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .dl-grid a { display: block; border: 1.5px solid var(--ink); background: #fff; padding: 13px; color: inherit; text-decoration: none; }
+  .dl-grid a:hover { background: var(--lime); }
+  .dl-grid a.likely { box-shadow: 3px 3px 0 var(--ink); }
+  .dl-grid small { display: block; margin-bottom: 6px; font-size: .58rem; font-weight: 900; text-transform: uppercase; }
+  .dl-grid strong { display: block; font-size: .95rem; }
+  .dl-grid span { display: block; margin-top: 4px; color: var(--muted); font-size: .62rem; }
+  @media (max-width: 480px) { .dl-grid { grid-template-columns: 1fr; } }
   .mast .repo-link { display: inline-flex; align-items: center; gap: 7px; }
   .lane .output { margin: 14px 0 0; border: 0; padding: 0; }
   .method-map { grid-template-columns: 1fr auto 1fr auto 1fr; }
