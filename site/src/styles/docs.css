@@ -124,7 +124,7 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
   .docs-sidebar[data-sidebar-collapsed="true"] .sidebar-copy { display: none; }
   .docs-sidebar { margin-bottom: 8px; }
   .docs-sidebar[data-sidebar-collapsed="true"]::after { content: "pages"; position: absolute; left: 48px; top: 17px; line-height: 1; font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-  .copy-btn { min-height: 0; width: 28px; height: 28px; }
+  .copy-btn { display: none; }
   .docs-mast { width: calc(100% - 20px); flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 0 10px; }
   .docs-mast .brand { font-size: 1.2rem; gap: 6px; }
   .docs-mast .brand svg { width: 22px; height: 22px; }
@@ -162,5 +162,4 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
 .copy-btn.done { background: var(--lime); color: #171715; }
 .copy-btn.failed { background: var(--red); color: #fff; }
 .copy-btn:active:not(:disabled) { transform: none; box-shadow: none; }
-@media (hover: none) { .copy-btn { opacity: 1; } }
 @media (max-width: 750px) { .docs-search-btn span, .docs-search-btn kbd { display: none; } }
