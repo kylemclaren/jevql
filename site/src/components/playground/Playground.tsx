@@ -169,6 +169,7 @@ export default function Playground() {
             <button type="button" className="secondary" onClick={() => run("explain")} disabled={!!busy}>{busy === "explain" ? "planning…" : "explain"} <KbdGroup><Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>↵</Kbd></KbdGroup></button>
             <span className="pg-hint">Read-only demo data. Every row that survives the SQL filters is judged; this node caps a query at 300 rows.</span>
           </div>
+          <div className={"pg-progress" + (busy ? " on" : "")} role="progressbar" aria-busy={!!busy} aria-label={busy === "explain" ? "planning" : "judging"}><i /></div>
         </div>
 
         {error && <p className="pg-error" role="alert">{error}</p>}

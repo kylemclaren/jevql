@@ -319,6 +319,12 @@ For a team, run one shared engine and point every client at it:
 jevql serve --listen 0.0.0.0:7433 --token secret     # behind your own TLS proxy
 ```
 
+For an open demo node drop the token with `--insecure` (or `JEVQL_INSECURE=1`)
+and fence it with `--cors <origins>`, `--rate-limit <per minute per IP>`,
+`--max-rows <n>` and a read-only database role. That is how the public
+playground at https://jevql.fly.dev/playground is served; `deploy/` has a
+Dockerfile and fly.toml for your own node.
+
 ## MCP
 
 `jevql mcp` is an MCP server for agents: tools `query`, `explain`, `judge`,

@@ -129,7 +129,7 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
   .docs-mast { width: calc(100% - 24px); flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 0 10px; }
   .docs-mast .brand { font-size: 1.15rem; gap: 6px; }
   .docs-mast .brand svg { width: 22px; height: 22px; }
-  .docs-tag { display: none; }
+  .docs-tag, .docs-mast .play-link { display: none !important; }
   .docs-mast .mast-right { width: auto; flex-direction: row; align-items: stretch; gap: 6px; }
   .docs-mast .mast-right :is(a.repo-link, button.theme-toggle, button.docs-search-btn) { display: inline-flex; align-items: center; justify-content: center; height: 34px; min-height: 0; padding: 0 10px; border: 1px solid var(--ink); font-size: .58rem; line-height: 1; box-sizing: border-box; }
   .docs-mast .mast-right astro-island { display: contents; }

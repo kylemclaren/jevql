@@ -56,6 +56,20 @@ MCP clients connect to `https://<your-app>.fly.dev/mcp` with the same bearer tok
 
 One bearer token per node, set with `JEVQL_TOKEN` or `--token`. Everything except `/openapi.json` requires it. The token is compared in constant time. There is no per-user auth in v1; put an identity-aware proxy in front if you need one.
 
+## An open node
+
+A demo or a public playground does not want a token. Set `JEVQL_INSECURE=1` (or pass `--insecure`) and the node answers anyone. Pair it with the other knobs so an open node stays cheap and read-only:
+
+| | |
+|---|---|
+| `JEVQL_INSECURE=1` | serve without a bearer token |
+| `JEVQL_CORS=https://example.com,https://other.example` | origins allowed to call the API from a browser (`*` for any) |
+| `JEVQL_RATE_LIMIT=60` | requests per minute per client IP; excess gets `429` with code `rate` |
+| `JEVQL_MAX_ROWS=300` | cap on rows judged by one query; more returns `402` with code `budget` |
+| a read-only database role | the only thing that stops a `DELETE` |
+
+The public playground at [jevql.fly.dev/playground](https://jevql.fly.dev/playground) runs exactly this: a node with no token, a reader role, a rate limit and a row cap. Its settings drawer lets you point the playground at your own node instead.
+
 ## What the node holds
 
 | | |
