@@ -124,8 +124,13 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
   .docs-sidebar[data-sidebar-collapsed="true"] .sidebar-copy { display: none; }
   .docs-sidebar { margin-bottom: 8px; }
   .docs-sidebar[data-sidebar-collapsed="true"]::after { content: "pages"; position: absolute; left: 48px; top: 17px; line-height: 1; font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-  .docs-mast { width: calc(100% - 20px); flex-direction: row; align-items: center; }
-  .docs-mast .mast-right { width: auto; flex-direction: row; gap: 8px; }
+  .copy-btn { min-height: 0; width: 28px; height: 28px; }
+  .docs-mast { width: calc(100% - 20px); flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 0 10px; }
+  .docs-mast .brand { font-size: 1.2rem; gap: 6px; }
+  .docs-mast .brand svg { width: 22px; height: 22px; }
+  .docs-mast .mast-right { width: auto; flex-direction: row; align-items: center; gap: 6px; }
+  .docs-mast .repo-link, .docs-mast .theme-toggle, .docs-search-btn { padding: 6px 8px; font-size: .58rem; }
+  .theme-toggle .moon, .theme-toggle .sun { font-size: .7rem; }
   .doc-pager { grid-template-columns: 1fr; }
 }
 

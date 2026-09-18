@@ -49,7 +49,7 @@ const install = "brew install kylemclaren/tap/jevql"
       <p class="lede">
         A psql-shaped CLI. Put
         <code class="hero-snippet"><span class="kw">WHERE</span> <span class="fn">jev</span><span class="pn">(</span>people<span class="pn">,</span> <span class="str">'could work from home'</span><span class="pn">)</span></code>
-        in a query: Postgres runs the SQL, Jev judges the rows, you get a psql table. No extension to install, the server only sees plain SQL.
+        in a query: Postgres runs the SQL, Jev judges the rows, you get a psql table. Works on any Postgres you can already connect to, no extension required.
       </p>
       <div class="install-cta">
         <button id="download" class="secondary" type="button">
@@ -438,7 +438,17 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .install-cta button { text-transform: none; padding: 18px 24px; font-size: .92rem; box-shadow: 4px 4px 0 var(--ink); }
   .install-cta button .material-symbols-rounded { font-size: 1.3rem; }
   .install-cta button:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--ink); }
-  @media (max-width: 750px) { .install-cta { flex-direction: column; } .install-cta button { width: 100%; } }
+  /* phones: one tidy masthead row, no download buttons (the install section covers it) */
+  @media (max-width: 750px) {
+    .mast { flex-direction: row; align-items: center; justify-content: space-between; padding-bottom: 10px; }
+    .mast .brand { font-size: 1.25rem; }
+    .mast-right { width: auto; flex-direction: row; align-items: center; gap: 8px; }
+    .mast .tagline { display: none; }
+    .mast .repo-link { padding: 6px 8px; font-size: .6rem; }
+    .install-cta { display: none; }
+    .truth-strip { margin-top: 8px; }
+    .copy-btn { min-height: 0; width: 28px; height: 28px; }
+  }
   button.secondary { background: #fff; }
   button.secondary:hover:not(:disabled) { background: var(--lime); }
   button.small { padding: 8px 9px; box-shadow: 2px 2px 0 var(--ink); }
