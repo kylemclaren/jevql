@@ -65,6 +65,19 @@ client at it:
 db = Jevql(url="http://jevql.internal:7433", token="secret")
 ```
 
+## Judging rows you already have
+
+```python
+res = db.judge("is about billing", [{"subject": "Charged twice"}, {"subject": "API returns 500"}])
+[a.passed for a in res]      # [True, False]
+res.answers[0].p             # 0.93
+
+db.judge("which team?", rows, kind="choice", options=["billing", "technical"])  # answers carry .choice / .probabilities
+db.judge("how angry?", rows, kind="score", options=["calm", "annoyed", "furious"])  # .score / .norm
+```
+
+No database involved; identical rows are judged once and answers share the cache with `query`.
+
 ## Errors
 
 ```python

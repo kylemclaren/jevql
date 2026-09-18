@@ -1,11 +1,11 @@
 import { Engine } from "./engine.js"
 import { HttpTransport } from "./http.js"
 import { explainOf, type Transport } from "./transport.js"
-import type { EmbeddedOptions, Explain, Health, JevqlOptions, QueryOptions, QueryResult, RemoteOptions } from "./types.js"
+import type { EmbeddedOptions, Explain, Health, JevqlOptions, JudgeRequest, JudgeResult, QueryOptions, QueryResult, RemoteOptions } from "./types.js"
 
 export { JevqlError } from "./error.js"
 export { engineArgs, platformPackage, resolveEngine, PLATFORM_PACKAGES } from "./engine.js"
-export type { EmbeddedOptions, ErrorCode, Explain, Health, HttpOptions, JevqlOptions, QueryOptions, QueryResult, RemoteOptions, Stats } from "./types.js"
+export type { EmbeddedOptions, ErrorCode, Explain, Health, HttpOptions, JevqlOptions, JudgeAnswer, JudgeRequest, JudgeResult, QueryOptions, QueryResult, RemoteOptions, Stats } from "./types.js"
 
 /**
  * jevql client.
@@ -74,6 +74,11 @@ export class Jevql {
   /** Plan and cost estimate for a jev query. Makes no TypeSafe call. */
   async explain(sql: string): Promise<Explain> {
     return explainOf(await (await this.ready()).query(sql, { explain: true }))
+  }
+
+  /** Judge rows you already hold with one question. No database involved; shares the cache with query. */
+  async judge(req: JudgeRequest): Promise<JudgeResult> {
+    return (await this.ready()).judge(req)
   }
 
   /** Engine or server health. */

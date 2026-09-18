@@ -228,3 +228,25 @@ func (c *Client) Close(ctx context.Context) error {
 	}
 	return err
 }
+
+// JudgeRequest judges rows you already hold; see exec.JudgeRequest.
+type JudgeRequest = exec.JudgeRequest
+
+// JudgeResult is the answer set, in input order.
+type JudgeResult = exec.JudgeResult
+
+// JudgeAnswer is one row's answer.
+type JudgeAnswer = exec.JudgeAnswer
+
+// Judge asks one question about each row without touching the database.
+// It shares batching, dedup and the cache with Query.
+func (c *Client) Judge(ctx context.Context, req JudgeRequest) (*JudgeResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	res, err := c.ex.JudgeRows(ctx, req)
+	if err != nil {
+		code, _ := wire.Classify(err)
+		return nil, &Error{Code: code, Err: err}
+	}
+	return res, nil
+}

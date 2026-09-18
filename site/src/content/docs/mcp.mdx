@@ -1,0 +1,74 @@
+---
+title: MCP server
+description: Let agents query your Postgres semantically over the Model Context Protocol.
+section: Integrate
+order: 24
+---
+
+`jevql mcp` exposes the engine as an MCP server, so Claude Code, Claude Desktop, Cursor and any other MCP client can run jev queries, estimate their cost, judge rows and browse the catalog. The same server is mounted at `/mcp` on `jevql serve`, for agents that connect over HTTP.
+
+## Connect
+
+Connection and TypeSafe settings come from the usual places: `DATABASE_URL`, `PG*`, `TYPESAFE_API_KEY`, or the saved config file.
+
+**Claude Code**
+
+```bash
+claude mcp add jevql -- jevql mcp
+```
+
+**Claude Desktop** (`claude_desktop_config.json`)
+
+```json
+{
+  "mcpServers": {
+    "jevql": {
+      "command": "jevql",
+      "args": ["mcp"],
+      "env": { "DATABASE_URL": "postgres://...", "TYPESAFE_API_KEY": "tsk_..." }
+    }
+  }
+}
+```
+
+**Cursor** (`.cursor/mcp.json`)
+
+```json
+{ "mcpServers": { "jevql": { "command": "jevql", "args": ["mcp"] } } }
+```
+
+**Remote, over HTTP.** Run `jevql serve --token secret` (or the deployed node) and point the client at `https://host/mcp` with `Authorization: Bearer secret`. The transport is streamable HTTP, stateless.
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `query` | Runs a SELECT. Plain SQL passes through; `jev()`, `jev_prob()`, `jev_choice()` and `jev_score()` judge rows. Returns columns, rows and stats (tokens, USD). Accepts `threshold` and `max_rows`. |
+| `explain` | The collect SQL Postgres will run, rows surviving the filters, batches, and an estimate of tokens and USD. No TypeSafe call. |
+| `judge` | Judges objects you pass in `rows` with one question (`noul`, `choice` or `score`). No database involved; answers are cached. |
+| `list_tables` | Tables, views and materialized views on the connected database. |
+| `describe_table` | Columns, types, nullability, defaults and indexes of one table, like `\d`. |
+
+Examples of what an agent sends:
+
+```json
+{ "name": "query", "arguments": { "sql": "SELECT subject FROM tickets WHERE jev(tickets, 'is asking for a refund') AND status = 'open'" } }
+{ "name": "explain", "arguments": { "sql": "SELECT * FROM emails WHERE jev(emails, 'is a newsletter')" } }
+{ "name": "judge", "arguments": { "question": "is urgent", "rows": [ { "subject": "Site down" }, { "subject": "Logo feedback" } ] } }
+{ "name": "describe_table", "arguments": { "name": "tickets" } }
+```
+
+Errors come back as tool errors with the same codes as the REST API (`sql`, `budget`, `api`), so the agent can read them and adjust.
+
+## Resource and prompt
+
+- Resource `jevql://sql-surface`: a Markdown reference of the jev functions, where they may appear and what is rejected. Clients can attach it to context.
+- Prompt `semantic-query`: takes a plain-language `request` and an optional `table` and instructs the model to write a jevql SELECT that keeps cheap filters in SQL and calls `explain` first when the estimate is large.
+
+## Read-only by default
+
+The server rejects anything that is not a SELECT. Start it with `jevql mcp --allow-writes` if an agent should be able to run DML or DDL through it. `--max-rows` caps the rows any single query may collect, which bounds what an agent can spend per call.
+
+<Callout kind="warn">
+Whatever the agent selects is sent to TypeSafe when a jev function is involved. Give the server a role that can only see the tables you are willing to judge.
+</Callout>

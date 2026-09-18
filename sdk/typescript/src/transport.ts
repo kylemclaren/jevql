@@ -1,8 +1,9 @@
-import type { Explain, Health, QueryOptions, QueryResult } from "./types.js"
+import type { Explain, Health, JudgeRequest, JudgeResult, QueryOptions, QueryResult } from "./types.js"
 
 export interface Transport {
   query(sql: string, opts?: QueryOptions & { explain?: boolean }): Promise<QueryResult>
   health(): Promise<Health>
+  judge(req: JudgeRequest): Promise<JudgeResult>
 }
 
 export function explainOf(res: QueryResult): Explain {

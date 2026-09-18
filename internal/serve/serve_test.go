@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/kylemclaren/jevql/internal/cache"
 	"github.com/kylemclaren/jevql/internal/exec"
 	"github.com/kylemclaren/jevql/internal/parse"
 	"github.com/kylemclaren/jevql/internal/typesafe"
@@ -189,5 +190,162 @@ func TestListenRandomPortReady(t *testing.T) {
 	cancel()
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func do(t *testing.T, h http.Handler, method, path, token string, body any) (int, []byte) {
+	t.Helper()
+	var rd *bytes.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	} else {
+		rd = bytes.NewReader(nil)
+	}
+	req := httptest.NewRequest(method, path, rd)
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	return rr.Code, rr.Body.Bytes()
+}
+
+func TestJudgeEndpoint(t *testing.T) {
+	ex, calls := testExec(t)
+	st, err := cache.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ex.Cache = st
+	s := &Server{Exec: ex, Version: "test", Model: "jev-test"}
+	h := s.Handler()
+	rows := []map[string]any{{"name": "Ada"}, {"name": "Zed"}, {"name": "Ada"}}
+	code, body := do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "wfh", Rows: rows})
+	if code != 200 {
+		t.Fatalf("judge: %d %s", code, body)
+	}
+	var res wire.JudgeResult
+	if err := json.Unmarshal(body, &res); err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Answers) != 3 || !*res.Answers[0].Pass || *res.Answers[1].Pass || res.Stats.Judged != 2 || *calls != 1 {
+		t.Errorf("answers=%+v stats=%+v calls=%d", res.Answers, res.Stats, *calls)
+	}
+	// second call: all cache hits, no HTTP
+	code, body = do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "wfh", Rows: rows[:2]})
+	_ = json.Unmarshal(body, &res)
+	if code != 200 || res.Stats.CacheHits != 2 || *calls != 1 {
+		t.Errorf("cache: %d %+v calls=%d", code, res.Stats, *calls)
+	}
+	// score with norm
+	code, body = do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "how?", Kind: "score", Options: []string{"lo", "mid", "hi"}, Rows: rows[:1]})
+	_ = json.Unmarshal(body, &res)
+	if code != 200 || res.Answers[0].Score == nil || *res.Answers[0].Norm != 0.75 {
+		t.Errorf("score: %d %+v", code, res.Answers)
+	}
+	// validation
+	for _, bad := range []wire.JudgeRequest{{Question: "", Rows: rows}, {Question: "x", Kind: "bogus", Rows: rows}, {Question: "x", Kind: "choice", Rows: rows}} {
+		code, body = do(t, h, "POST", "/v1/judge", "", bad)
+		var eb wire.ErrorBody
+		_ = json.Unmarshal(body, &eb)
+		if code != 400 || eb.Code != "sql" {
+			t.Errorf("validation %+v: %d %s", bad, code, body)
+		}
+	}
+	// budget
+	ex.Opts.MaxRows = 2
+	code, body = do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "new q", Rows: rows})
+	if code != 402 {
+		t.Errorf("budget: %d %s", code, body)
+	}
+	ex.Opts.MaxRows = 2500
+	// auth
+	s.Token = "t"
+	code, _ = do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "x", Rows: rows})
+	if code != 401 {
+		t.Errorf("auth: %d", code)
+	}
+}
+
+func TestExplainEndpoint(t *testing.T) {
+	ex, calls := testExec(t)
+	s := &Server{Exec: ex, Version: "test", Model: "jev-test"}
+	h := s.Handler()
+	code, body := do(t, h, "POST", "/v1/explain", "", wire.QueryRequest{SQL: "SELECT name FROM people WHERE jev(people, 'wfh') AND country = 'PT'"})
+	var x wire.Explain
+	_ = json.Unmarshal(body, &x)
+	if code != 200 || x.Rows != 6 || x.CollectSQL == "" || *calls != 0 {
+		t.Errorf("explain: %d %s calls=%d", code, body, *calls)
+	}
+	code, body = do(t, h, "POST", "/v1/explain", "", wire.QueryRequest{SQL: "SELECT 1"})
+	if code != 400 {
+		t.Errorf("plain sql explain: %d %s", code, body)
+	}
+}
+
+func TestCacheEndpoints(t *testing.T) {
+	ex, _ := testExec(t)
+	st, err := cache.Open(filepath.Join(t.TempDir(), "c.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ex.Cache = st
+	s := &Server{Exec: ex, Version: "test", Model: "jev-test"}
+	h := s.Handler()
+	code, body := do(t, h, "GET", "/v1/cache", "", nil)
+	if code != 403 {
+		t.Errorf("disabled: %d %s", code, body)
+	}
+	s.CacheAdmin = true
+	do(t, h, "POST", "/v1/judge", "", wire.JudgeRequest{Question: "wfh", Rows: []map[string]any{{"name": "Ada"}}})
+	code, body = do(t, h, "GET", "/v1/cache", "", nil)
+	var info CacheInfo
+	_ = json.Unmarshal(body, &info)
+	if code != 200 || info.Entries != 1 || info.Path == "" {
+		t.Errorf("info: %d %s", code, body)
+	}
+	code, body = do(t, h, "DELETE", "/v1/cache", "", nil)
+	var cl CacheCleared
+	_ = json.Unmarshal(body, &cl)
+	if code != 200 || cl.Deleted != 1 {
+		t.Errorf("clear: %d %s", code, body)
+	}
+}
+
+func TestSchemaEndpoints(t *testing.T) {
+	ex, _ := testExec(t)
+	s := &Server{Exec: ex, Version: "test", Model: "jev-test"}
+	h := s.Handler()
+	code, body := do(t, h, "GET", "/v1/schema/tables", "", nil)
+	var list []TableInfo
+	_ = json.Unmarshal(body, &list)
+	names := map[string]bool{}
+	for _, tb := range list {
+		if tb.Schema == "jevql_serve_test" {
+			names[tb.Name] = true
+		}
+	}
+	if code != 200 || !names["people"] || !names["tickets"] || !names["cities"] {
+		t.Errorf("tables: %d %v", code, names)
+	}
+	code, body = do(t, h, "GET", "/v1/schema/tables/people", "", nil)
+	var d TableDetail
+	_ = json.Unmarshal(body, &d)
+	if code != 200 || d.Name != "people" || d.Kind != "table" || len(d.Columns) != 9 || d.Columns[0].Name != "id" || d.Columns[0].Nullable || len(d.Indexes) != 1 {
+		t.Errorf("describe: %d %s", code, body)
+	}
+	code, body = do(t, h, "GET", "/v1/schema/tables/jevql_serve_test.people", "", nil)
+	if code != 200 {
+		t.Errorf("qualified: %d %s", code, body)
+	}
+	code, body = do(t, h, "GET", "/v1/schema/tables/nope", "", nil)
+	var eb wire.ErrorBody
+	_ = json.Unmarshal(body, &eb)
+	if code != 404 || eb.Code != "sql" {
+		t.Errorf("missing: %d %s", code, body)
 	}
 }

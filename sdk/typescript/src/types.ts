@@ -101,3 +101,34 @@ export interface Health {
   version: string
   model?: string
 }
+
+/** Body of POST /v1/judge: rows you already hold, one question. */
+export interface JudgeRequest {
+  question: string
+  /** noul (default), choice or score */
+  kind?: "noul" | "choice" | "score"
+  /** choice options or score levels */
+  options?: string[]
+  /** noul: pass when p >= threshold */
+  threshold?: number
+  rows: Record<string, unknown>[]
+  /** include the raw TypeSafe answer */
+  raw?: boolean
+}
+
+/** One row's answer, in input order. */
+export interface JudgeAnswer {
+  p?: number
+  pass?: boolean
+  choice?: string
+  score?: number
+  norm?: number
+  confidence?: number
+  probabilities?: Record<string, number>
+  raw?: unknown
+}
+
+export interface JudgeResult {
+  answers: JudgeAnswer[]
+  stats: Stats | null
+}

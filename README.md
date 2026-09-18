@@ -319,6 +319,17 @@ For a team, run one shared engine and point every client at it:
 jevql serve --listen 0.0.0.0:7433 --token secret     # behind your own TLS proxy
 ```
 
+## MCP
+
+`jevql mcp` is an MCP server for agents: tools `query`, `explain`, `judge`,
+`list_tables` and `describe_table`, a `jevql://sql-surface` resource and a
+`semantic-query` prompt. Read-only unless started with `--allow-writes`.
+
+```bash
+claude mcp add jevql -- jevql mcp        # Claude Code
+jevql serve --token secret               # also mounts the same server at /mcp over HTTP
+```
+
 ## Development
 
 ```bash

@@ -28,6 +28,9 @@ describe("integration", () => {
       expect(res.columns).toEqual(["one", "t"])
       expect(res.rows).toEqual([[1, "x"]])
       await expect(j.query("SELECT * FROM nope_table")).rejects.toMatchObject({ code: "sql", status: 400 })
+      await expect(j.judge({ question: "", rows: [{ a: 1 }] })).rejects.toMatchObject({ code: "sql", status: 400 })
+      const empty = await j.judge({ question: "is empty", rows: [] })
+      expect(empty.answers).toEqual([])
     } finally {
       await j.close()
     }

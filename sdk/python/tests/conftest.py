@@ -81,6 +81,14 @@ class MockServer:
                 if srv.token and self.headers.get("Authorization") != f"Bearer {srv.token}":
                     return self._send(401, json.dumps({"error": "unauthorized", "code": "auth"}).encode())
                 nxt = srv.next
+                if self.path == "/v1/judge" and nxt[0] == "ok":
+                    if not body.get("question"):
+                        return self._send(400, json.dumps({"error": "question is required", "code": "sql"}).encode())
+                    rows = body.get("rows") or []
+                    answers = [{"p": 0.9 if r.get("name") == "Ada" else 0.1, "pass": r.get("name") == "Ada", "confidence": 0.9} for r in rows]
+                    doc = {"answers": answers, "stats": {"collect_rows": len(rows), "judged": len(rows), "requests": 1, "cache_hits": 0,
+                                                         "input_tokens": 100, "output_tokens": 5, "usd": 0.000004, "elapsed_ms": 10}}
+                    return self._send(200, json.dumps(doc).encode())
                 if nxt[0] == "ok":
                     doc = EXPLAIN if body.get("explain") else SAMPLE
                     return self._send(200, json.dumps(doc).encode())

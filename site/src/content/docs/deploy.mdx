@@ -1,0 +1,70 @@
+---
+title: Deploy a node
+description: Run jevql serve as a shared service for one Postgres, with a bearer token, on Fly.io or any container host.
+section: Integrate
+order: 25
+---
+
+A node is `jevql serve` in a container: one HTTP API and one MCP endpoint in front of one Postgres, with a shared answer cache. Clients only need the URL and a token.
+
+<Steps>
+
+### Fly.io
+
+```bash
+cp deploy/fly.toml fly.toml && sed -i 's/^app = .*/app = "my-jevql"/' fly.toml
+fly apps create my-jevql
+fly volumes create jevql_data --size 1 --region iad
+fly secrets set DATABASE_URL='postgres://user:pass@host:5432/db' \
+                TYPESAFE_API_KEY='tsk_...' \
+                JEVQL_TOKEN="$(openssl rand -hex 32)"
+fly deploy
+```
+
+Fly terminates TLS at the edge, so the token only travels over HTTPS. The volume keeps the cache across deploys.
+
+### Anywhere else
+
+```bash
+docker build -f deploy/Dockerfile -t jevql .
+docker run -p 8080:8080 -v jevql_data:/data \
+  -e DATABASE_URL=... -e TYPESAFE_API_KEY=... -e JEVQL_TOKEN=... jevql
+```
+
+Put it behind TLS. `jevql serve` refuses a non-loopback address without a token unless you pass `--insecure`.
+
+### Use it
+
+```bash
+curl -H "Authorization: Bearer $JEVQL_TOKEN" https://my-jevql.fly.dev/v1/health
+```
+
+```ts
+const db = new Jevql({ url: "https://my-jevql.fly.dev", token: process.env.JEVQL_TOKEN })
+```
+
+```python
+db = Jevql(url="https://my-jevql.fly.dev", token=os.environ["JEVQL_TOKEN"])
+```
+
+MCP clients connect to `https://my-jevql.fly.dev/mcp` with the same bearer token. The full API is at `/openapi.json`.
+
+</Steps>
+
+## Auth
+
+One bearer token per node, set with `JEVQL_TOKEN` or `--token`. Everything except `/openapi.json` requires it. The token is compared in constant time. There is no per-user auth in v1; put an identity-aware proxy in front if you need one.
+
+## What the node holds
+
+| | |
+|---|---|
+| `DATABASE_URL` | the one Postgres it serves; read-only credentials are a good idea |
+| `TYPESAFE_API_KEY` | held server-side; clients never see it |
+| `/data/cache.db` | the shared answer cache on the volume |
+| `JEVQL_ALLOW_CACHE_ADMIN=1` | enables `GET`/`DELETE /v1/cache` |
+| `--allow-writes` | lets MCP tools run non-SELECT statements (off by default) |
+
+<Callout kind="warn">
+Every client with the token can run any SQL the database user is allowed to run. Give the node a read-only role unless you want writes.
+</Callout>

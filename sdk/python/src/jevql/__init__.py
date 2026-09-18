@@ -13,7 +13,7 @@ package; ``Jevql(url=...)`` talks to a shared ``jevql serve``::
 from .client import Jevql
 from .engine import Engine, resolve_engine
 from .errors import JevqlError
-from .models import Explain, QueryResult, Stats
+from .models import Explain, JudgeAnswer, JudgeResult, QueryResult, Stats
 from .transport import EmbeddedTransport, HttpTransport, Transport
 
 __all__ = [
@@ -22,6 +22,8 @@ __all__ = [
     "QueryResult",
     "Stats",
     "Explain",
+    "JudgeAnswer",
+    "JudgeResult",
     "Transport",
     "HttpTransport",
     "EmbeddedTransport",

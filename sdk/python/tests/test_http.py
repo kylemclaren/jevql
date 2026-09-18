@@ -1,6 +1,6 @@
 import pytest
 
-from jevql import Explain, Jevql, JevqlError, QueryResult, Stats
+from jevql import Explain, Jevql, JevqlError, JudgeResult, QueryResult, Stats
 
 
 def test_query_success(server):
@@ -91,3 +91,31 @@ def test_no_url_means_embedded():
     db = Jevql()
     assert db.embedded and db.transport.engine.process is None  # nothing spawned until first use
     db.close()
+
+
+def test_judge(server):
+    server.token = "t"
+    with Jevql(url=server.url, token="t") as db:
+        res = db.judge("could work from home", [{"name": "Ada"}, {"name": "Zed"}], threshold=0.5)
+    assert isinstance(res, JudgeResult)
+    assert [a.passed for a in res] == [True, False]
+    assert res.answers[0].p == 0.9 and res.stats.judged == 2
+    req = server.requests[-1]
+    assert req["path"] == "/v1/judge"
+    assert req["headers"]["Authorization"] == "Bearer t"
+    assert req["body"] == {"question": "could work from home", "kind": "noul", "rows": [{"name": "Ada"}, {"name": "Zed"}], "threshold": 0.5}
+    server.token = None
+
+
+def test_judge_choice_body(server):
+    with Jevql(url=server.url) as db:
+        db.judge("team?", [{"name": "Ada"}], kind="choice", options=["billing", "technical"], raw=True)
+    body = server.requests[-1]["body"]
+    assert body["kind"] == "choice" and body["options"] == ["billing", "technical"] and body["raw"] is True
+
+
+def test_judge_validation_error(server):
+    with Jevql(url=server.url) as db:
+        with pytest.raises(JevqlError) as e:
+            db.judge("", [{"a": 1}])
+    assert e.value.code == "sql" and e.value.status == 400

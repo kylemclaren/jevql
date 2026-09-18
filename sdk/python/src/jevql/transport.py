@@ -24,6 +24,10 @@ class Transport(ABC):
     ) -> Dict[str, Any]:
         """Return the raw QueryResult dict for one statement."""
 
+    @abstractmethod
+    def judge(self, body: Mapping[str, Any]) -> Dict[str, Any]:
+        """Return the raw JudgeResult dict for a JudgeRequest body."""
+
     def health(self) -> Dict[str, Any]:
         return {"ok": True}
 
@@ -80,6 +84,9 @@ class HttpTransport(Transport):
             body["explain"] = True
         return self._request("POST", "/v1/query", body)
 
+    def judge(self, body: Mapping[str, Any]) -> Dict[str, Any]:
+        return self._request("POST", "/v1/judge", body)
+
     def health(self) -> Dict[str, Any]:
         return self._request("GET", "/v1/health")
 
@@ -100,6 +107,9 @@ class EmbeddedTransport(Transport):
 
     def run(self, sql, *, threshold=None, max_rows=None, explain=False):
         return self._client().run(sql, threshold=threshold, max_rows=max_rows, explain=explain)
+
+    def judge(self, body: Mapping[str, Any]) -> Dict[str, Any]:
+        return self._client().judge(body)
 
     def health(self) -> Dict[str, Any]:
         return self._client().health()

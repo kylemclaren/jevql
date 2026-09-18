@@ -1,0 +1,39 @@
+# A jevql node on Fly.io. Copy this file, set `app`, then:
+#   fly launch --copy-config --no-deploy      # or: fly apps create <name>
+#   fly volumes create jevql_data --size 1 --region iad
+#   fly secrets set DATABASE_URL=postgres://... TYPESAFE_API_KEY=tsk_... JEVQL_TOKEN=$(openssl rand -hex 32)
+#   fly deploy --dockerfile deploy/Dockerfile
+# Then from any client:
+#   curl -H "Authorization: Bearer $JEVQL_TOKEN" https://<app>.fly.dev/v1/health
+app = "jevql-node"
+primary_region = "iad"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+
+[env]
+  JEVQL_LISTEN = "0.0.0.0:8080"
+  JEVQL_CACHE = "/data/cache.db"
+  # JEVQL_ALLOW_CACHE_ADMIN = "1"   # enables GET/DELETE /v1/cache over the API
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    method = "GET"
+    path = "/v1/health"
+    # health is behind the token; the check only needs a response, 401 counts as alive
+    grace_period = "10s"
+
+[mounts]
+  source = "jevql_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

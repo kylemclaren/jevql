@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from .engine import Engine
 from .errors import JevqlError
-from .models import Explain, QueryResult
+from .models import Explain, JudgeResult, QueryResult
 from .transport import EmbeddedTransport, HttpTransport, Transport
 
 
@@ -69,6 +69,26 @@ class Jevql:
         if res.explain is None:
             raise JevqlError("statement has no jev_* calls; nothing to explain", code="sql")
         return res.explain
+
+    def judge(
+        self,
+        question: str,
+        rows: Sequence[Mapping[str, Any]],
+        *,
+        kind: str = "noul",
+        options: Optional[Sequence[str]] = None,
+        threshold: Optional[float] = None,
+        raw: bool = False,
+    ) -> JudgeResult:
+        """Judge rows you already hold. No database involved; shares the cache with ``query``."""
+        body: Dict[str, Any] = {"question": question, "kind": kind, "rows": list(rows)}
+        if options:
+            body["options"] = list(options)
+        if threshold is not None:
+            body["threshold"] = float(threshold)
+        if raw:
+            body["raw"] = True
+        return JudgeResult.from_dict(self.transport.judge(body))
 
     def health(self) -> Dict[str, Any]:
         return self.transport.health()

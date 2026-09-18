@@ -1,6 +1,6 @@
 import { JevqlError, codeForStatus } from "./error.js"
 import type { Transport } from "./transport.js"
-import type { ErrorBody, Health, HttpOptions, QueryOptions, QueryResult } from "./types.js"
+import type { ErrorBody, Health, HttpOptions, JudgeRequest, JudgeResult, QueryOptions, QueryResult } from "./types.js"
 
 export class HttpTransport implements Transport {
   private readonly base: string
@@ -21,14 +21,10 @@ export class HttpTransport implements Transport {
     return h
   }
 
-  async query(sql: string, opts: QueryOptions & { explain?: boolean } = {}): Promise<QueryResult> {
-    const body: Record<string, unknown> = { sql }
-    if (opts.threshold !== undefined) body.threshold = opts.threshold
-    if (opts.maxRows !== undefined) body.max_rows = opts.maxRows
-    if (opts.explain) body.explain = true
+  private async post<T>(path: string, body: unknown): Promise<T> {
     let res: Response
     try {
-      res = await this.fetchFn(`${this.base}/v1/query`, { method: "POST", headers: this.headers(), body: JSON.stringify(body) })
+      res = await this.fetchFn(`${this.base}${path}`, { method: "POST", headers: this.headers(), body: JSON.stringify(body) })
     } catch (e) {
       throw new JevqlError(`jevql: cannot reach ${this.base}: ${(e as Error).message}`, "transport")
     }
@@ -46,10 +42,22 @@ export class HttpTransport implements Transport {
       throw new JevqlError(msg, code, res.status)
     }
     try {
-      return JSON.parse(text) as QueryResult
+      return JSON.parse(text) as T
     } catch {
       throw new JevqlError("jevql: server returned invalid JSON", "transport", res.status)
     }
+  }
+
+  async query(sql: string, opts: QueryOptions & { explain?: boolean } = {}): Promise<QueryResult> {
+    const body: Record<string, unknown> = { sql }
+    if (opts.threshold !== undefined) body.threshold = opts.threshold
+    if (opts.maxRows !== undefined) body.max_rows = opts.maxRows
+    if (opts.explain) body.explain = true
+    return this.post<QueryResult>("/v1/query", body)
+  }
+
+  async judge(req: JudgeRequest): Promise<JudgeResult> {
+    return this.post<JudgeResult>("/v1/judge", req)
   }
 
   async health(): Promise<Health> {

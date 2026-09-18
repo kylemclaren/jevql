@@ -100,3 +100,49 @@ class QueryResult:
 
     def __iter__(self):
         return iter(self.rows)
+
+
+@dataclass
+class JudgeAnswer:
+    """One row's answer from ``judge``; fields depend on the question kind."""
+
+    p: Optional[float] = None
+    passed: Optional[bool] = None
+    choice: Optional[str] = None
+    score: Optional[float] = None
+    norm: Optional[float] = None
+    confidence: Optional[float] = None
+    probabilities: Optional[Dict[str, float]] = None
+    raw: Optional[Any] = None
+
+    @classmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> "JudgeAnswer":
+        return cls(
+            p=d.get("p"),
+            passed=d.get("pass"),
+            choice=d.get("choice"),
+            score=d.get("score"),
+            norm=d.get("norm"),
+            confidence=d.get("confidence"),
+            probabilities=d.get("probabilities"),
+            raw=d.get("raw"),
+        )
+
+
+@dataclass
+class JudgeResult:
+    answers: List[JudgeAnswer]
+    stats: Optional[Stats]
+
+    @classmethod
+    def from_dict(cls, d: Mapping[str, Any]) -> "JudgeResult":
+        return cls(
+            answers=[JudgeAnswer.from_dict(a) for a in d.get("answers") or []],
+            stats=Stats.from_dict(d["stats"]) if d.get("stats") else None,
+        )
+
+    def __len__(self) -> int:
+        return len(self.answers)
+
+    def __iter__(self):
+        return iter(self.answers)

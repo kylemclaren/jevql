@@ -181,6 +181,9 @@ def test_real_engine_roundtrip():
         res = db.query("SELECT 1 AS one, 'x' AS s")
         assert res.columns == ["one", "s"] and res.rows == [[1, "x"]]
         assert res.jev is False
+        assert db.judge("is empty", []).answers == []
+        with pytest.raises(JevqlError):
+            db.judge("", [{"a": 1}])
         proc = db.transport.engine.process
         assert proc.poll() is None
     assert proc.poll() is not None

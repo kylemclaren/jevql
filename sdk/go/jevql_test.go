@@ -123,3 +123,38 @@ func TestNewDefaults(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestJudge(t *testing.T) {
+	c, calls := testClient(t)
+	ctx := context.Background()
+	rows := []map[string]any{{"name": "Ada", "job": "engineer"}, {"name": "Ravi", "job": "cook"}, {"name": "Ada", "job": "engineer"}}
+	res, err := c.Judge(ctx, JudgeRequest{Question: "could work from home", Rows: rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Answers) != 3 || *res.Answers[0].P != 0.9 || !*res.Answers[0].Pass || *res.Answers[1].Pass {
+		t.Errorf("answers = %+v", res.Answers)
+	}
+	if res.Stats.Judged != 2 || *calls != 1 {
+		t.Errorf("dedup: stats=%+v calls=%d", res.Stats, *calls)
+	}
+	res, err = c.Judge(ctx, JudgeRequest{Question: "could work from home", Rows: rows[:1]})
+	if err != nil || res.Stats.CacheHits != 1 || *calls != 1 {
+		t.Errorf("cache: stats=%+v calls=%d err=%v", res.Stats, *calls, err)
+	}
+	res, err = c.Judge(ctx, JudgeRequest{Question: "team?", Kind: "choice", Options: []string{"a", "b"}, Rows: rows[:1], Raw: true})
+	if err != nil || res.Answers[0].Choice == "" || res.Answers[0].Raw == nil {
+		t.Errorf("choice: %+v %v", res, err)
+	}
+	var je *Error
+	_, err = c.Judge(ctx, JudgeRequest{Question: "", Rows: rows})
+	if !errors.As(err, &je) || je.Code != "sql" {
+		t.Errorf("validation error = %v", err)
+	}
+	mr := 1
+	c.ex.Opts.MaxRows = mr
+	_, err = c.Judge(ctx, JudgeRequest{Question: "x", Rows: rows})
+	if !errors.As(err, &je) || je.Code != "budget" {
+		t.Errorf("budget error = %v", err)
+	}
+}

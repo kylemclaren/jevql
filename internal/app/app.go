@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/kylemclaren/jevql/internal/cache"
 	"github.com/kylemclaren/jevql/internal/exec"
+	mcpserver "github.com/kylemclaren/jevql/internal/mcp"
 	"github.com/kylemclaren/jevql/internal/parse"
 	"github.com/kylemclaren/jevql/internal/psqlout"
 	"github.com/kylemclaren/jevql/internal/serve"
@@ -74,6 +76,10 @@ type Config struct {
 	Serve       bool
 	ReadyJSON   bool
 	ParentPID   int
+	Insecure    bool
+	CacheAdmin  bool
+	MCP         bool
+	AllowWrites bool
 	Listen      string
 	Token       string
 	ShowVersion bool
@@ -128,10 +134,13 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.StringVar(&c.Token, "token", os.Getenv("JEVQL_TOKEN"), "bearer token required by `jevql serve` (default $JEVQL_TOKEN)")
 	fs.BoolVar(&c.ReadyJSON, "ready-json", false, "serve: print a JSON line with the bound address on stdout once listening (for SDKs)")
 	fs.IntVar(&c.ParentPID, "parent-pid", 0, "serve: exit when this process id goes away (for SDKs that embed the engine)")
+	fs.BoolVar(&c.AllowWrites, "allow-writes", false, "mcp/serve: let MCP tools run non-SELECT statements")
+	fs.BoolVar(&c.Insecure, "insecure", false, "serve: allow listening on a non-loopback address without a token")
+	fs.BoolVar(&c.CacheAdmin, "allow-cache-admin", os.Getenv("JEVQL_ALLOW_CACHE_ADMIN") != "", "serve: enable GET/DELETE /v1/cache (default $JEVQL_ALLOW_CACHE_ADMIN)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, "jevql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
-		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n  jevql serve [--listen 127.0.0.1:7433] [--token SECRET] [dbname | postgres://...]\n\nFlags:")
+		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n  jevql serve [--listen 127.0.0.1:7433] [--token SECRET] [dbname | postgres://...]\n  jevql mcp [--allow-writes] [dbname | postgres://...]   (MCP server on stdio)\n\nFlags:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nEnvironment: DATABASE_URL, PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, TYPESAFE_API_KEY, TYPESAFE_API_URL, JEV_THRESHOLD")
 	}
@@ -148,6 +157,10 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	}
 	if len(c.Positional) > 0 && c.Positional[0] == "serve" {
 		c.Serve = true
+		c.Positional = c.Positional[1:]
+	}
+	if len(c.Positional) > 0 && c.Positional[0] == "mcp" {
+		c.MCP = true
 		c.Positional = c.Positional[1:]
 	}
 	return c, nil
@@ -270,7 +283,7 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	if cfg.CSV || cfg.JSON || cfg.JSONTable {
 		u.color = false
 	}
-	interactive := isTerminal(stdin) && cfg.Command == "" && cfg.File == "" && !cfg.Serve
+	interactive := isTerminal(stdin) && cfg.Command == "" && cfg.File == "" && !cfg.Serve && !cfg.MCP
 	toSave := map[string]string{}
 	if interactive && !hasConnectionInfo(cfg) {
 		fmt.Fprintln(stderr, u.style(dimStyle, "No database configured (use a postgres:// URL, -h/-d flags, DATABASE_URL or PG* env).", u.colorErr))
@@ -308,6 +321,8 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	defer s.close()
 
 	switch {
+	case cfg.MCP:
+		return s.mcp(ctx)
 	case cfg.Serve:
 		return s.serve(ctx)
 	case cfg.Command != "":
@@ -336,7 +351,12 @@ func (s *session) serve(ctx context.Context) int {
 	if s.cfg.APIKey == "" {
 		s.ui.warnf("no TypeSafe API key configured; jev queries will fail until TYPESAFE_API_KEY is set")
 	}
-	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model}
+	if !isLoopback(s.cfg.Listen) && s.cfg.Token == "" && !s.cfg.Insecure {
+		s.ui.errorf("refusing to listen on %s without a token: set --token / JEVQL_TOKEN, or pass --insecure", s.cfg.Listen)
+		return ExitSQL
+	}
+	srv := &serve.Server{Exec: s.ex, Token: s.cfg.Token, Version: version, Model: s.cfg.Model, CacheAdmin: s.cfg.CacheAdmin,
+		MCP: mcpserver.Handler(mcpserver.New(s.ex, mcpserver.Options{Version: version, AllowWrites: s.cfg.AllowWrites, MaxRows: s.cfg.MaxRows}))}
 	if s.cfg.Verbose {
 		srv.Log = func(format string, args ...any) { s.ui.notef("serve: "+format, args...) }
 	}
@@ -357,6 +377,32 @@ func (s *session) serve(ctx context.Context) int {
 		return ExitSQL
 	}
 	return ExitOK
+}
+
+// mcp serves the Model Context Protocol on stdio for local agents.
+func (s *session) mcp(ctx context.Context) int {
+	if s.cfg.APIKey == "" {
+		s.ui.warnf("no TypeSafe API key configured; jev tools will fail until TYPESAFE_API_KEY is set")
+	}
+	srv := mcpserver.New(s.ex, mcpserver.Options{Version: version, AllowWrites: s.cfg.AllowWrites, MaxRows: s.cfg.MaxRows})
+	if err := mcpserver.RunStdio(ctx, srv); err != nil && !errors.Is(err, context.Canceled) {
+		s.ui.errorf("%v", err)
+		return ExitSQL
+	}
+	return ExitOK
+}
+
+// isLoopback reports whether a listen address binds only to localhost.
+func isLoopback(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	if host == "" || host == "localhost" {
+		return host == "localhost"
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // session is one connected CLI.

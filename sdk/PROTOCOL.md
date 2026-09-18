@@ -18,6 +18,33 @@ jevql serve [--listen 127.0.0.1:7433] [--token SECRET]
   needs `Authorization: Bearer <token>`.
 - Content type is `application/json` both ways.
 
+### More endpoints
+
+All take the same bearer token. The full contract is served by the engine at
+`GET /openapi.json` (no auth), an OpenAPI 3.1 document.
+
+- `POST /v1/explain` — body `QueryRequest`; returns the `Explain` object only.
+  `400 sql` when the statement has no `jev_*` calls.
+- `POST /v1/judge` — judge rows you already hold, no database involved:
+  ```jsonc
+  { "question": "could work from home", "kind": "noul", "options": [], "threshold": 0.5, "raw": false,
+    "rows": [{"name": "Ada", "job_title": "Staff engineer"}, {"name": "Ravi", "job_title": "Line cook"}] }
+  ```
+  Response `{"answers": [...], "stats": {...}}`, one answer per row in input
+  order. noul answers carry `p`, `pass`, `confidence`; choice answers `choice`,
+  `confidence`, `probabilities`; score answers `score`, `norm` (score divided
+  by levels minus one), `confidence`, `probabilities`. `raw: true` adds the raw
+  TypeSafe answer. Identical rows are judged once; answers share the cache with
+  SQL queries (same key). `402 budget` when the rows exceed `--max-rows` or
+  `--max-chars`.
+- `GET /v1/cache` → `{"entries": n, "path": "..."}`; `DELETE /v1/cache` →
+  `{"deleted": n}`. Both answer `403 auth` unless the server enables cache
+  admin.
+- `GET /v1/schema/tables` → `[{"schema","name","kind"}]` for user tables,
+  views, materialized views and foreign tables.
+- `GET /v1/schema/tables/{name}` → `{"schema","name","kind","columns":[{"name","type","nullable","default"}],"indexes":[{"name","definition"}]}`;
+  `name` may be schema-qualified; `404 sql` when it does not exist.
+
 ## Transport B: the CLI
 
 ```

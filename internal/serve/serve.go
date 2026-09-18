@@ -30,6 +30,10 @@ type Server struct {
 	Version string
 	Model   string
 	Log     func(format string, args ...any)
+	// CacheAdmin enables GET/DELETE /v1/cache. Off by default when the
+	// server is reachable beyond loopback.
+	CacheAdmin bool
+	MCP        http.Handler // optional: mounted at /mcp behind the bearer check
 
 	mu sync.Mutex // pgx connections are not safe for concurrent use
 }
@@ -39,7 +43,28 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/health", s.health)
 	mux.HandleFunc("/v1/query", s.query)
+	mux.HandleFunc("/v1/explain", s.explain)
+	mux.HandleFunc("/v1/judge", s.judge)
+	mux.HandleFunc("/v1/cache", s.cache)
+	mux.HandleFunc("/v1/schema/tables", s.schemaTables)
+	mux.HandleFunc("/v1/schema/tables/", s.schemaTable)
+	mux.HandleFunc("/openapi.json", s.openapi)
+	if s.MCP != nil {
+		mux.Handle("/mcp", s.requireAuth(s.MCP))
+		mux.Handle("/mcp/", s.requireAuth(s.MCP))
+	}
 	return mux
+}
+
+// requireAuth wraps a handler with the bearer check.
+func (s *Server) requireAuth(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, wire.ErrorBody{Error: "missing or invalid bearer token", Code: "auth"})
+			return
+		}
+		h.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) authorized(r *http.Request) bool {
@@ -111,20 +136,11 @@ func (s *Server) query(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// run executes with per-request option overrides, serialised on the connection.
+// run executes on a per-request executor copy, serialised on the connection.
 func (s *Server) run(ctx context.Context, req wire.QueryRequest) (*wire.QueryResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	saved := s.Exec.Opts
-	defer func() { s.Exec.Opts = saved }()
-	if req.Threshold != nil {
-		s.Exec.Opts.Threshold = *req.Threshold
-	}
-	if req.MaxRows != nil {
-		s.Exec.Opts.MaxRows = *req.MaxRows
-	}
-	s.Exec.Opts.Explain = req.Explain
-	res, err := s.Exec.Run(ctx, req.SQL)
+	res, err := s.executor(req.Threshold, req.MaxRows, req.Explain).Run(ctx, req.SQL)
 	if err != nil {
 		return nil, err
 	}

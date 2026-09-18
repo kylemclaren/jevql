@@ -72,6 +72,18 @@ bundled `@jevql/engine-<os>-<arch>` package, then a `jevql` binary on
 `PATH`. If none is found the error names the install commands
 (`brew install kylemclaren/tap/jevql` or `npm i @jevql/engine-...`).
 
+## Judging rows you already have
+
+```ts
+const res = await db.judge({
+  question: "is about billing",
+  rows: [{ subject: "Charged twice" }, { subject: "API returns 500" }],
+})
+res.answers // [{ p: 0.93, pass: true, confidence: 0.93 }, { p: 0.04, pass: false, ... }]
+```
+
+`kind: "choice"` with `options`, or `kind: "score"` with ordered levels, work the same way; answers carry `choice`/`probabilities` or `score`/`norm`. Identical rows are judged once and answers share the cache with `query`.
+
 ## Errors
 
 Every failure is a `JevqlError` with `code` (`sql`, `budget`, `api`, `auth`,

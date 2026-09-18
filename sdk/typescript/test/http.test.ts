@@ -15,6 +15,14 @@ beforeAll(() => {
       const body = req.method === "POST" ? await req.json() : null
       seen.push({ path: url.pathname, method: req.method, auth: req.headers.get("authorization"), body })
       if (url.pathname === "/v1/health") return Response.json({ ok: true, version: "0.1.0", model: "jev-latest" })
+      if (url.pathname === "/v1/judge") {
+        const jb = body as { question: string; rows: Record<string, unknown>[] }
+        if (!jb.question) return Response.json({ error: "question is required", code: "sql" }, { status: 400 })
+        return Response.json({
+          answers: jb.rows.map((r) => ({ p: r.name === "Ada" ? 0.9 : 0.1, pass: r.name === "Ada" })),
+          stats: { collect_rows: jb.rows.length, judged: jb.rows.length, requests: 1, cache_hits: 0, input_tokens: 100, output_tokens: 5, usd: 0.000004, elapsed_ms: 10 },
+        })
+      }
       if (url.pathname !== "/v1/query") return new Response("nope", { status: 404 })
       const b = body as { sql: string; explain?: boolean }
       const fail = /^FAIL (\d+)/.exec(b.sql)
@@ -33,6 +41,22 @@ beforeAll(() => {
 afterAll(() => server.stop(true))
 
 describe("http transport", () => {
+  test("judge posts the request and returns answers in order", async () => {
+    seen.length = 0
+    const j = new Jevql({ url: base, token: "t" })
+    const res = await j.judge({ question: "could work from home", rows: [{ name: "Ada" }, { name: "Zed" }], threshold: 0.5 })
+    expect(seen[0]!.path).toBe("/v1/judge")
+    expect(seen[0]!.auth).toBe("Bearer t")
+    expect(seen[0]!.body).toEqual({ question: "could work from home", rows: [{ name: "Ada" }, { name: "Zed" }], threshold: 0.5 })
+    expect(res.answers.map((a) => a.pass)).toEqual([true, false])
+    expect(res.stats?.judged).toBe(2)
+  })
+
+  test("judge validation error maps to code sql", async () => {
+    const j = new Jevql({ url: base })
+    await expect(j.judge({ question: "", rows: [{ a: 1 }] })).rejects.toMatchObject({ code: "sql", status: 400 })
+  })
+
   test("query returns the QueryResult and sends the body", async () => {
     seen.length = 0
     const j = new Jevql({ url: base + "/" })

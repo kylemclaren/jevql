@@ -152,3 +152,10 @@ func itoa(n int) string {
 }
 
 var _ = http.StatusOK
+
+// Judge types live in exec (wire imports exec); these aliases keep the API in one place.
+type (
+	JudgeRequest = exec.JudgeRequest
+	JudgeAnswer  = exec.JudgeAnswer
+	JudgeResult  = exec.JudgeResult
+)

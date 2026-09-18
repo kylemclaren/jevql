@@ -49,6 +49,28 @@ Only `sql` is required. `threshold` and `max_rows` override the server defaults 
 
 `tag` is the Postgres command tag, so row-less statements return `INSERT 0 1` or `CREATE TABLE` with empty `columns`. `stats` is `null` for plain SQL. Values use the same canonical encoding as the cache: numbers as numbers, timestamps as RFC 3339 strings, `bytea` as base64, json columns as nested JSON.
 
+## More endpoints
+
+The complete contract is served by every engine at `GET /openapi.json` as an OpenAPI 3.1 document. In short:
+
+**`POST /v1/explain`** takes the same body as `/v1/query` and returns the `Explain` object only. No TypeSafe calls.
+
+**`POST /v1/judge`** judges rows you already hold, with no database involved:
+
+```json
+{"question": "is about billing", "kind": "noul", "rows": [{"subject": "Charged twice"}, {"subject": "API returns 500"}]}
+```
+
+```json
+{"answers": [{"p": 0.93, "pass": true, "confidence": 0.93}, {"p": 0.04, "pass": false, "confidence": 0.96}], "stats": {"judged": 2, "requests": 1, "cache_hits": 0, "usd": 0.00002, "...": "..."}}
+```
+
+`kind` is `noul` (default), `choice` with `options`, or `score` with ordered `options`; answers then carry `choice` and `probabilities`, or `score` and `norm`. Identical rows are judged once, and answers share the cache with SQL queries. `--max-rows` and `--max-chars` apply.
+
+**`GET /v1/cache`** and **`DELETE /v1/cache`** report and clear the answer cache. They return `403` unless the server enables cache admin.
+
+**`GET /v1/schema/tables`** lists user relations; **`GET /v1/schema/tables/{name}`** describes one, with columns and indexes, like `\d`.
+
 ## Errors
 
 ```json
@@ -61,6 +83,8 @@ Only `sql` is required. `threshold` and `max_rows` override the server defaults 
 | 402 | `budget` | `--max-rows` or `--max-chars` fired; nothing was sent to TypeSafe |
 | 502 | `api` | TypeSafe returned an error |
 | 401 | `auth` | bad or missing bearer token |
+| 403 | `auth` | feature disabled on this server (cache admin) |
+| 404 | `sql` | relation not found (schema endpoints) |
 
 ## How the SDKs embed it
 
