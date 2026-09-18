@@ -1,0 +1,270 @@
+---
+title: Triage support tickets
+description: Route open tickets to the right team with jev_choice, rank them by urgency with jev_score, grade the routing against labelled data, and ship it as a nightly job.
+section: Cookbook
+order: 41
+---
+
+Every support queue has the same two questions: *who should take this?* and *what should they take first?* Both are judgment calls about text, which is what `jev_*` functions do. This guide builds a triage step on top of a `tickets` table, measures how well it routes, and ships it as a scheduled job.
+
+Everything below ran against the demo store behind the [playground](/playground/): 2,500 tickets, 845 of them open. The table looks like this:
+
+```text
+tickets(id, customer_id, subject, body, status, priority, created_at, expected_team)
+```
+
+`expected_team` is the label a human gave each ticket. You will not have that column in production, but if you have any labelled history, keep it around: it is how you find out whether the routing is any good before you trust it.
+
+## What you need
+
+- The [CLI](/docs/install/) for the exploration steps, and `pip install jevql psycopg[binary]` for the job.
+- `DATABASE_URL` and `TYPESAFE_API_KEY` in the environment.
+- A tickets table with a subject and a body. Any names work; the column-list form below names them explicitly.
+
+## 1. Route ten tickets
+
+Start in the CLI with the newest open tickets. `jev_choice` takes a question and a fixed list of options and returns one of them.
+
+```sql
+SELECT id, left(subject, 40) AS subject,
+       jev_choice((subject, body), 'Which team should handle this ticket?',
+                  ARRAY['billing','technical','shipping','sales','product','legal','security']) AS team
+FROM tickets
+WHERE status = 'open'
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+```
+  id  |          subject           |   team
+------+----------------------------+-----------
+  216 | Webhook retries            | technical
+ 1869 | Invoice PDF broken         | technical
+ 1885 | Shipping to IE?            | shipping
+ 1930 | Angry: third time asking   | product
+  794 | Delivery left in the rain  | shipping
+  321 | Enterprise pricing?        | sales
+  707 | Discount for nonprofits    | sales
+ 2096 | Where is my order 6202?    | shipping
+ 1685 | Delivery left in the rain  | shipping
+ 1401 | Feature request: dark mode | product
+(10 rows)
+```
+
+Two things to notice. The column-list form `(subject, body)` sends only those two columns to the model, not the whole row. And because there is no `jev` call in `WHERE`, the `LIMIT 10` runs on Postgres, so exactly ten tickets are judged.
+
+Most of these look right. "Angry: third time asking" went to product, which is probably wrong. One row is an anecdote; the next step turns it into a number.
+
+## 2. Grade it
+
+`GROUP BY` works on a `jev_choice` column, so a confusion matrix is one query. Judge every open ticket and count where each label landed:
+
+```sql
+SELECT expected_team,
+       jev_choice((subject, body), 'Which team should handle this ticket?',
+                  ARRAY['billing','technical','shipping','sales','product','legal','security']) AS routed,
+       count(*)
+FROM tickets
+WHERE status = 'open'
+GROUP BY 1, 2
+ORDER BY 1, 3 DESC;
+```
+
+```
+ expected_team |  routed   | count
+---------------+-----------+-------
+ billing       | billing   |    98
+ billing       | product   |    63
+ billing       | technical |    22
+ legal         | legal     |    36
+ product       | product   |    94
+ product       | sales     |     7
+ sales         | sales     |   151
+ security      | security  |    37
+ shipping      | shipping  |   161
+ shipping      | product   |     1
+ technical     | technical |    79
+ technical     | product   |    67
+ technical     | security  |    29
+(13 rows)
+jev: 467 judged, 12 req, 0 cache hits, 88.1k in tokens, $0.0037, 2.83s
+```
+
+656 of 845 tickets landed on their label: 78%. The last line, from `-v`, says what that cost. 845 tickets became 467 judgements because identical subject and body pairs are judged once, and the whole pass cost under half a cent.
+
+The matrix also says *where* it goes wrong. Billing and technical tickets leak into product. Add the subject to the grouping and the pattern is obvious: "Angry: third time asking" (a billing complaint with no billing words in it), "Refund request" for a damaged item, "Invoice PDF broken". The bare question gives the model nothing to go on except the team names, so it guesses what "product" means.
+
+## 3. Describe the teams
+
+The question is the spec. Say what each team owns, in the question itself:
+
+```sql
+SELECT expected_team,
+       jev_choice((subject, body),
+         'Which team should handle this ticket? '
+         'billing: charges, refunds, invoices, subscriptions and cancellations. '
+         'technical: bugs, outages, logins, API, webhooks, accessibility and broken devices. '
+         'shipping: delivery, tracking, wrong or late items, shipping destinations. '
+         'sales: pricing, quotes, seats, discounts, bulk orders. '
+         'product: feature requests, praise, sizing and product questions. '
+         'legal: data export, privacy, contracts. '
+         'security: vulnerabilities, suspicious activity.',
+         ARRAY['billing','technical','shipping','sales','product','legal','security']) AS routed,
+       count(*)
+FROM tickets
+WHERE status = 'open'
+GROUP BY 1, 2
+ORDER BY 1, 3 DESC;
+```
+
+```
+ expected_team |  routed   | count
+---------------+-----------+-------
+ billing       | billing   |   137
+ billing       | technical |    24
+ billing       | shipping  |    12
+ billing       | product   |    10
+ legal         | legal     |    36
+ product       | product   |   101
+ sales         | sales     |   151
+ security      | security  |    37
+ shipping      | shipping  |   162
+ technical     | technical |   175
+(10 rows)
+jev: 467 judged, 12 req, 0 cache hits, 89.2k in tokens, $0.0037, 2.21s
+```
+
+799 of 845, or 95%, for the same money. Six of the seven teams are now perfect. What remains is billing, and the remaining misses are defensible: a broken invoice PDF *is* a technical problem, and a refund for a crushed box has a shipping story in it. Whether those belong to billing is a policy question. Put the policy in the question and the model will follow it.
+
+<Callout kind="tip">
+Postgres SQL joins adjacent string literals across lines, so a long question can be written as several quoted lines with no concatenation operator. Keep single quotes out of it, or double them.
+</Callout>
+
+## 4. Rank by urgency
+
+The `priority` column is whatever the customer clicked in the form. `jev_score` reads the ticket instead. It takes an ordered list of levels and returns a weighted position in that list, so `low, normal, high, urgent` maps to 0 to 3.
+
+```sql
+SELECT id, priority, left(subject, 40) AS subject,
+       jev_score((subject, body), 'How urgent is this ticket?', ARRAY['low','normal','high','urgent']) AS urgency
+FROM tickets
+WHERE status = 'open' AND created_at > now() - interval '7 days'
+ORDER BY urgency DESC
+LIMIT 8;
+```
+
+```
+  id  | priority |          subject           | urgency
+------+----------+----------------------------+---------
+ 1243 | high     | API returns 500 on /orders |    2.99
+ 1298 | normal   | API returns 500 on /orders |    2.99
+ 1795 | low      | Angry: third time asking   |    2.98
+ 1930 | high     | Angry: third time asking   |    2.98
+  341 | high     | Security concern           |    2.88
+  876 | low      | Security concern           |    2.88
+  545 | normal   | Security concern           |    2.88
+  228 | normal   | Cannot log in              |    2.72
+(8 rows)
+```
+
+Ticket 1795 is a customer asking for the third time, filed as *low*. Ticket 876 is a security report, filed as *low*. The score puts both near the top regardless of the form field. Sorting by a `jev` column happens in the client after judging, so the `WHERE` clause is what keeps this cheap: 35 tickets from the last week, 32 distinct, one request.
+
+## 5. Ship it as a job
+
+Both answers in one query, written to a routes table, on a schedule. The job uses the Python SDK for the judged query and plain psycopg for the write, so jevql only ever needs a read-only role.
+
+```sql
+CREATE TABLE ticket_routes (
+  ticket_id  int PRIMARY KEY REFERENCES tickets,
+  team       text NOT NULL,
+  urgency    float8 NOT NULL,
+  routed_at  timestamptz NOT NULL DEFAULT now()
+);
+```
+
+```python
+# triage.py: route open tickets to a team and rank them by urgency.
+# Run it on a schedule. Answers are cached, so a re-run only pays for new tickets.
+import os
+import psycopg
+from jevql import Jevql
+
+TEAMS = ["billing", "technical", "shipping", "sales", "product", "legal", "security"]
+ROUTE = (
+    "Which team should handle this ticket? "
+    "billing: charges, refunds, invoices, subscriptions and cancellations. "
+    "technical: bugs, outages, logins, API, webhooks, accessibility and broken devices. "
+    "shipping: delivery, tracking, wrong or late items, shipping destinations. "
+    "sales: pricing, quotes, seats, discounts, bulk orders. "
+    "product: feature requests, praise, sizing and product questions. "
+    "legal: data export, privacy, contracts. "
+    "security: vulnerabilities, suspicious activity."
+)
+URGENCY = ["low", "normal", "high", "urgent"]
+
+def arr(xs): return "ARRAY[" + ", ".join(f"'{x}'" for x in xs) + "]"
+
+SQL = f"""
+SELECT id,
+       jev_choice((subject, body), '{ROUTE}', {arr(TEAMS)}) AS team,
+       jev_score((subject, body), 'How urgent is this ticket?', {arr(URGENCY)}) AS urgency
+FROM tickets
+WHERE status = 'open' AND created_at > now() - interval '7 days'
+"""
+
+UPSERT = """
+INSERT INTO ticket_routes (ticket_id, team, urgency)
+VALUES (%s, %s, %s)
+ON CONFLICT (ticket_id) DO UPDATE SET team = EXCLUDED.team, urgency = EXCLUDED.urgency, routed_at = now()
+"""
+
+with Jevql() as db, psycopg.connect(os.environ["DATABASE_URL"]) as pg:
+    res = db.query(SQL)                     # Postgres filters, Jev judges, rows come back
+    with pg.cursor() as cur:
+        cur.executemany(UPSERT, res.rows)   # [id, team, urgency] per row
+    s = res.stats
+    print(f"{res.row_count} tickets routed; {s.judged} judged, {s.cache_hits} from cache, ${s.usd:.4f}")
+```
+
+```
+$ python triage.py
+35 tickets routed; 64 judged, 0 from cache, $0.0004
+$ python triage.py
+35 tickets routed; 64 judged, 64 from cache, $0.0000
+```
+
+The second run is free. The cache key is the question, the options and the row content, so a ticket is only judged again if its text changes. Widen the window to a month and the job still only pays for tickets it has not seen. Put it in cron, or in whatever runs your nightly jobs, and the routes table is always a few minutes behind the queue.
+
+Support staff query `ticket_routes` like any other table:
+
+```sql
+SELECT t.id, t.subject, r.urgency
+FROM ticket_routes r JOIN tickets t ON t.id = r.ticket_id
+WHERE r.team = 'billing' AND t.status = 'open'
+ORDER BY r.urgency DESC;
+```
+
+## 6. Route at intake, without the database
+
+The same routing works on a ticket that is not in Postgres yet, for example inside the webhook that receives it. `judge()` takes rows you already hold, uses the same cache, and returns the answer with its probabilities:
+
+```python
+ticket = {"subject": "Someone else's parcel arrived",
+          "body": "I got a box addressed to a different customer and my own order is missing. Order 4411."}
+
+r = db.judge(ROUTE, [ticket], kind="choice", options=TEAMS)
+r.answers[0].choice          # "shipping"
+r.answers[0].probabilities   # {"shipping": 1, "billing": 0, ...}
+
+u = db.judge("How urgent is this ticket?", [ticket], kind="score", options=URGENCY)
+u.answers[0].score           # 1.71, between normal and high
+```
+
+Same questions, same options, so the intake path and the nightly job agree with each other and share one cache.
+
+## Where to go next
+
+- Add a third call for tone: `jev_score((subject, body), 'How angry is the customer?', ARRAY['calm','annoyed','furious'])`, and route anything furious to a human first.
+- Keep grading. Store the team that actually resolved each ticket, and re-run the confusion matrix from step 2 against it every month. When it drifts, the fix is in the question.
+- Run the job against a shared node instead of an embedded engine so the whole team shares one cache: `Jevql(url=..., token=...)`. See [Deploy a node](/docs/deploy/).
+- Let an agent do the triage conversationally over [MCP](/docs/mcp/). It gets the same `query` tool and the same cache.
