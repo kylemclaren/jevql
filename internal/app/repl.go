@@ -13,8 +13,8 @@ import (
 	"github.com/ergochat/readline"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mclaren/jevpsql/internal/parse"
-	"github.com/mclaren/jevpsql/internal/psqlout"
+	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevpsql/internal/psqlout"
 )
 
 func (s *session) repl(ctx context.Context) int {

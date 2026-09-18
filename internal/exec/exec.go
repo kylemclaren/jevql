@@ -15,13 +15,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/mclaren/jevpsql/internal/cache"
-	"github.com/mclaren/jevpsql/internal/canon"
-	"github.com/mclaren/jevpsql/internal/parse"
-	"github.com/mclaren/jevpsql/internal/psqlout"
-	"github.com/mclaren/jevpsql/internal/rewrite"
-	"github.com/mclaren/jevpsql/internal/stats"
-	"github.com/mclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevpsql/internal/cache"
+	"github.com/kylemclaren/jevpsql/internal/canon"
+	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevpsql/internal/psqlout"
+	"github.com/kylemclaren/jevpsql/internal/rewrite"
+	"github.com/kylemclaren/jevpsql/internal/stats"
+	"github.com/kylemclaren/jevpsql/internal/typesafe"
 )
 
 // Options tune a jev execution.

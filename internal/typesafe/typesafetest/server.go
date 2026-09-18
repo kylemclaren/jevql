@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/mclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevpsql/internal/typesafe"
 )
 
 // Server answers every question with a fixed shape and counts requests.

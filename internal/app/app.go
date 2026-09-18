@@ -22,11 +22,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/term"
 
-	"github.com/mclaren/jevpsql/internal/cache"
-	"github.com/mclaren/jevpsql/internal/exec"
-	"github.com/mclaren/jevpsql/internal/parse"
-	"github.com/mclaren/jevpsql/internal/psqlout"
-	"github.com/mclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevpsql/internal/cache"
+	"github.com/kylemclaren/jevpsql/internal/exec"
+	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevpsql/internal/psqlout"
+	"github.com/kylemclaren/jevpsql/internal/typesafe"
 )
 
 const (

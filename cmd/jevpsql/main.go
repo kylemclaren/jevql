@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"github.com/mclaren/jevpsql/internal/app"
+	"github.com/kylemclaren/jevpsql/internal/app"
 )
 
 func main() {

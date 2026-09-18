@@ -21,7 +21,7 @@ Requires Go 1.23+ and a C compiler (libpg_query is bundled via
 [`pg_query_go`](https://github.com/pganalyze/pg_query_go) and needs CGO).
 
 ```bash
-CGO_ENABLED=1 go install github.com/mclaren/jevpsql/cmd/jevpsql@latest
+CGO_ENABLED=1 go install github.com/kylemclaren/jevpsql/cmd/jevpsql@latest
 ```
 
 The first build compiles libpg_query and takes about a minute. On macOS,

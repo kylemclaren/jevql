@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/mclaren/jevpsql/internal/cache"
-	"github.com/mclaren/jevpsql/internal/parse"
-	"github.com/mclaren/jevpsql/internal/typesafe"
-	"github.com/mclaren/jevpsql/internal/typesafe/typesafetest"
+	"github.com/kylemclaren/jevpsql/internal/cache"
+	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevpsql/internal/typesafe/typesafetest"
 )
 
 // testDB connects to $PGTEST_URL (skipping otherwise) and loads

@@ -13,8 +13,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
-	"github.com/mclaren/jevpsql/internal/stats"
-	"github.com/mclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevpsql/internal/stats"
+	"github.com/kylemclaren/jevpsql/internal/typesafe"
 )
 
 var (

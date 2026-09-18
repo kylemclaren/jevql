@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"github.com/mclaren/jevpsql/internal/psqlout"
+	"github.com/kylemclaren/jevpsql/internal/psqlout"
 )
 
 // rightAligned reports whether psql would right-align this type.
