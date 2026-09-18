@@ -116,10 +116,11 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nEnvironment: DATABASE_URL, PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, TYPESAFE_API_KEY, TYPESAFE_API_URL, JEV_THRESHOLD")
 	}
-	if err := fs.Parse(args); err != nil {
+	flags, positional := splitArgs(fs, args)
+	if err := fs.Parse(flags); err != nil {
 		return nil, err
 	}
-	c.Positional = fs.Args()
+	c.Positional = append(positional, fs.Args()...)
 	if c.APIKey == "" {
 		c.APIKey = os.Getenv("TYPESAFE_API_KEY")
 	}
@@ -127,6 +128,39 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 		return nil, errors.New("--csv and --json are mutually exclusive")
 	}
 	return c, nil
+}
+
+// splitArgs lets flags appear after positional arguments, like psql:
+// jevpsql "postgres://..." -c "SELECT 1".
+func splitArgs(fs *flag.FlagSet, args []string) (flags, positional []string) {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			positional = append(positional, args[i+1:]...)
+			break
+		}
+		if !strings.HasPrefix(a, "-") || a == "-" {
+			positional = append(positional, a)
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if strings.Contains(name, "=") {
+			continue
+		}
+		f := fs.Lookup(name)
+		if f == nil {
+			continue // let fs.Parse report it
+		}
+		if bf, ok := f.Value.(interface{ IsBoolFlag() bool }); ok && bf.IsBoolFlag() {
+			continue
+		}
+		if i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	return flags, positional
 }
 
 // Main runs the CLI and returns the exit code.
