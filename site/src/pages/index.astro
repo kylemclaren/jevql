@@ -4,7 +4,14 @@ import Mark from "@/mark.svg"
 import Tabs from "@/components/docs/Tabs.astro"
 import { Code } from "astro:components"
 import { siClaude, siCursor, siOpencode } from "simple-icons"
-import agentPrompt from "../../public/llms.txt?raw"
+import openaiPath from "../openai-path.txt?raw"
+const agentPrompt = "Set me up with jevql: https://jevql.fly.dev/agent-ready.md"
+const coins = [
+  { name: "Claude", d: siClaude.path },
+  { name: "OpenAI", d: openaiPath.trim() },
+  { name: "Cursor", d: siCursor.path },
+  { name: "OpenCode", d: siOpencode.path },
+]
 
 const goExample = `client, _ := jevql.New(ctx, jevql.Options{DatabaseURL: os.Getenv("DATABASE_URL")})
 defer client.Close(ctx)
@@ -84,13 +91,15 @@ const install = "brew install kylemclaren/tap/jevql"
         <button class="secondary copy" type="button" data-copy={install}>
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
-      </div>
-      <p class="agent-prompt">
-        <button class="copy prompt-btn" type="button" data-copy={agentPrompt}>
-          <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> copy prompt for your AI agent
+        <button class="copy prompt-pill" type="button" data-copy={agentPrompt} aria-label="Copy a prompt to give to your AI agent" title="Copies: Set me up with jevql: https://jevql.fly.dev/agent-ready.md">
+          <span class="coins" aria-hidden="true">
+            {coins.map((c, i) => (
+              <span class="coin" style={`z-index:${coins.length - i}`}><svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d={c.d} /></svg></span>
+            ))}
+          </span>
+          <span class="pill-text">Copy a prompt for <b>your agent</b></span>
         </button>
-        <span>Paste it into Claude, ChatGPT or Cursor and it knows how to install jevql, write jev() queries and wire the SDKs. Same text at <a href="/llms.txt">/llms.txt</a>.</span>
-      </p>
+      </div>
       <div class="truth-strip">
         <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
       </div>
@@ -192,7 +201,7 @@ const install = "brew install kylemclaren/tap/jevql"
         <code>judge</code> scores rows the agent already holds, and <code>list_tables</code> / <code>describe_table</code> let it find its way around.
         Read-only by default.
       </p>
-      <Tabs labels={["Claude Code", "OpenAI", "Cursor", "OpenCode"]} icons={[siClaude.path, undefined, siCursor.path, siOpencode.path]} storageKey="landing-mcp">
+      <Tabs labels={["Claude Code", "OpenAI", "Cursor", "OpenCode"]} icons={[siClaude.path, openaiPath.trim(), siCursor.path, siOpencode.path]} storageKey="landing-mcp">
         <div><Code code={mcpClaude} lang="bash" theme="github-light" /><p class="fine">Reads <code>DATABASE_URL</code> and <code>TYPESAFE_API_KEY</code> from your shell, like the CLI.</p></div>
         <div><Code code={mcpOpenAI} lang="bash" theme="github-light" /><p class="fine">ChatGPT only speaks to remote servers, so point it at a <a href="/docs/deploy/">node</a>. Codex runs the local one.</p></div>
         <div><Code code={mcpCursor} lang="json" theme="github-light" /><p class="fine">Enable it under Settings → MCP. Ask Cursor to "list the tables and find open tickets that sound angry".</p></div>
@@ -241,6 +250,14 @@ const install = "brew install kylemclaren/tap/jevql"
 
     // ---- copy buttons -------------------------------------------------
     function flash(btn: HTMLElement, ok = true) {
+      if (btn.classList.contains("prompt-pill")) {
+        const t = btn.querySelector(".pill-text")!
+        const original = t.innerHTML
+        t.innerHTML = ok ? "<b>Copied.</b> Paste it into your agent." : "Copy failed"
+        btn.classList.add("done")
+        setTimeout(() => { t.innerHTML = original; btn.classList.remove("done") }, 1600)
+        return
+      }
       const original = btn.innerHTML
       btn.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">${ok ? "check" : "close"}</span>${btn.classList.contains("small") ? "" : " copied"}`
       setTimeout(() => (btn.innerHTML = original), 1200)
@@ -501,9 +518,9 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
     .mast-right { width: auto; flex-direction: row; align-items: center; gap: 8px; }
     .mast .tagline { display: none; }
     .mast .repo-link { padding: 6px 8px; font-size: .6rem; }
-    .install-cta { display: none; }
-    .agent-prompt { margin-top: 4px; }
-    .agent-prompt span { display: none; }
+    .install-cta { display: flex; margin-top: 18px; }
+    .install-cta > #download, .install-cta > .secondary { display: none; }
+    .install-cta .prompt-pill { width: 100%; justify-content: flex-start; padding: 8px 12px 8px 8px; font-size: .8rem; }
     .truth-strip { margin-top: 8px; }
     .copy-btn { display: none; }
   }
@@ -557,11 +574,14 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .phase .copy-wrap { margin-top: 8px; }
   .phase .copy-wrap > pre { margin: 0; }
 
-  /* copy-prompt line under the hero buttons */
-  .agent-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0 0; font-size: .74rem; color: var(--muted); }
-  .agent-prompt .prompt-btn { padding: 9px 12px; background: #fff; box-shadow: 2px 2px 0 var(--ink); font-size: .62rem; text-transform: uppercase; }
-  .agent-prompt .prompt-btn:hover { background: var(--lime); }
-  .agent-prompt a { color: inherit; }
+  /* "copy a prompt for your agent" pill: a stack of tool marks + label, in the CTA row */
+  .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; background: #fff; text-transform: none; font-size: .74rem; font-weight: 600; text-align: left; }
+  .install-cta .prompt-pill:hover { background: var(--lime); }
+  .install-cta .prompt-pill.done { background: var(--lime); }
+  .prompt-pill .coins { display: inline-flex; }
+  .prompt-pill .coin { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1.5px solid var(--ink); background: var(--panel); color: var(--ink); margin-left: -8px; }
+  .prompt-pill .coin:first-child { margin-left: 0; }
+  .prompt-pill .pill-text b { font-weight: 900; }
   .mcp .doc-tabs { margin: 0 0 16px; }
   .tab-icon { margin-right: 6px; vertical-align: -2px; }
   .mcp .doc-tab { display: inline-flex; align-items: center; }
