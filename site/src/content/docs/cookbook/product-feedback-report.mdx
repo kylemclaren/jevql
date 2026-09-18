@@ -1,0 +1,372 @@
+---
+title: Product feedback report
+description: "Turn a reviews table into a weekly report: what people complain about, which products break, and which reviewers need a reply. Judged SQL, grouped and joined like any other."
+section: Cookbook
+order: 42
+---
+
+Star ratings tell you *how much* people liked something. The text tells you *why*, and the why is what a product team can act on. This guide reads the `reviews` table of the demo store (3,000 reviews of 30 products) and turns it into a report that answers three questions a week: what are people complaining about, which products are breaking, and who is waiting for a reply.
+
+Every query here is ordinary SQL with one `jev_*` call in it. Joins, `GROUP BY`, `count(*)`, `ORDER BY` and `LIMIT` all still work; jevql runs the plain parts on Postgres and judges only the rows that survive.
+
+```text
+reviews(id, product_id, customer_id, stars, title, body, created_at)
+products(id, name, category, price, description, in_stock)
+customers(id, name, email, city, country, plan, signed_up, notes)
+```
+
+## What you need
+
+- The [CLI](/docs/install/) for the exploration steps. For the job, the SDK in your language: `pip install jevql`, `npm i jevql`, or `go get github.com/kylemclaren/jevql/sdk/go`.
+- `DATABASE_URL` and `TYPESAFE_API_KEY` in the environment.
+- Reviews with some free text. Ratings are optional; they are only used here to narrow what gets judged.
+
+## 1. What people complain about
+
+Ask one question of every unhappy review and count the answers. `jev_choice` returns one of the options you give it, and a `jev_choice` column can be grouped like any other.
+
+```sql
+SELECT jev_choice((r.title, r.body), 'What is the main complaint in this review?',
+                  ARRAY['quality or durability','shipping or delivery','price or value',
+                        'size or fit','not as described','no complaint']) AS theme,
+       count(*)
+FROM reviews r
+WHERE r.stars <= 3 AND r.created_at > now() - interval '90 days'
+GROUP BY 1
+ORDER BY 2 DESC;
+```
+
+```
+         theme         | count
+-----------------------+-------
+ quality or durability |   124
+ not as described      |    49
+ no complaint          |    31
+ size or fit           |    18
+ shipping or delivery  |     9
+ price or value        |     7
+(6 rows)
+jev: 180 judged, 5 req, 0 cache hits, 33.5k in tokens, $0.0014, 917ms
+```
+
+Two things to notice. `stars <= 3` and the date range run on Postgres first, so only 238 reviews were collected and, after deduplication, 180 were judged. And "no complaint" is on the list on purpose: a three-star review that says "does the job, nothing more" should not be forced into a complaint bucket. Give the model an honest way out and the other counts get cleaner.
+
+Add `p.name` to the `SELECT` and the `GROUP BY` and the same query becomes a per-product breakdown. It costs nothing extra, because the same reviews are judged with the same question and the cache already holds every answer.
+
+## 2. Which products are breaking
+
+A yes-or-no question in `WHERE` filters rows, and `GROUP BY` on top of it makes a leaderboard:
+
+```sql
+SELECT p.name, count(*) AS complaints
+FROM reviews r JOIN products p ON p.id = r.product_id
+WHERE r.created_at > now() - interval '90 days'
+  AND jev((r.title, r.body), 'the product broke, wore out or stopped working')
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 8;
+```
+
+```
+        name         | complaints
+---------------------+------------
+ Hiking backpack 35L |          5
+ Air fryer XL        |          4
+ Linen bedsheets     |          4
+ Cold brew kit       |          4
+ Trail running shoes |          4
+ Beard trimmer       |          4
+ Cast iron skillet   |          4
+ Phone tripod        |          4
+(8 rows)
+jev: 428 judged, 11 req, 0 cache hits, 36.5k in tokens, $0.0015, 1.47s
+```
+
+No star filter this time, and that is deliberate: a four-star review that says "great until the strap tore" still counts. That is why it judged 428 reviews instead of 180. When a `jev` predicate is in `WHERE`, the `LIMIT` cannot run on Postgres, because Postgres does not know which rows will pass. jevql collects everything the plain filters allow, judges it, then groups, sorts and limits in the client. The date range is what keeps the collected set small.
+
+<Callout kind="tip">
+Run any of these with `--explain` first. It reports how many rows would be judged and what they would cost, without calling TypeSafe.
+</Callout>
+
+## 3. Drill into one product
+
+For one product, flip the question and ask the happy reviewers what they liked:
+
+```sql
+SELECT jev_choice((r.title, r.body), 'What does the reviewer like most?',
+                  ARRAY['how well it works','build quality','price','design or looks','ease of use']) AS likes,
+       count(*)
+FROM reviews r JOIN products p ON p.id = r.product_id
+WHERE p.name = 'Air fryer XL' AND r.stars >= 4
+GROUP BY 1
+ORDER BY 2 DESC;
+```
+
+```
+       likes       | count
+-------------------+-------
+ how well it works |    37
+ build quality     |    12
+ price             |    11
+ design or looks   |     3
+ ease of use       |     2
+(5 rows)
+jev: 45 judged, 2 req, 0 cache hits, 7.7k in tokens, $0.0003, 854ms
+```
+
+Pair it with the complaint query filtered to the same product and you have both halves of a product page: what to keep and what to fix.
+
+## 4. Reviewers who need a reply
+
+Some reviews are feedback. Others are a customer waiting for someone to get back to them. Join in the customer and pick out the second kind. The third argument raises the threshold to 0.7, so only clear cases make the list:
+
+```sql
+SELECT r.id, c.name AS customer, c.email, p.name AS product, left(r.body, 60) AS body
+FROM reviews r
+JOIN products p ON p.id = r.product_id
+JOIN customers c ON c.id = r.customer_id
+WHERE r.stars <= 2 AND r.created_at > now() - interval '30 days'
+  AND jev((r.title, r.body),
+          'the reviewer describes a defect or a wrong item and would want the seller to follow up', 0.7)
+ORDER BY r.created_at DESC;
+```
+
+```
+  id  |    customer     |         product          |                           body
+------+-----------------+--------------------------+-------------------------------------------------------------
+ 2581 | Joana Nguyen    | Sourdough starter kit    | Do not buy the Sourdough starter kit. the stitching came loo
+ 2545 | Noah Costa      | Camping stove            | Broke after 6 days. the battery fades fast. Avoid.
+ 1050 | Viktor Park     | Yoga mat                 | Not what I expected. the sizing runs small. Support was slow
+   14 | Viktor Conti    | Air fryer XL             | Broke after 8 days. the cable is too short. Avoid.
+ 2162 | Rosa Gómez      | Cold brew kit            | Disappointed. the lid does not seal properly. Considering re
+ ...
+(37 rows)
+jev: 48 judged, 2 req, 0 cache hits, 4.3k in tokens, $0.0002, 817ms
+```
+
+Only the review text is sent to the model. The join brings the customer's name and email into the result, but they are not part of the `(r.title, r.body)` source, so they never leave your database.
+
+## 5. Ship it as a weekly report
+
+Three queries, one Markdown document, posted wherever your team reads. The job below runs the mix, the breakage leaderboard and the reply list for the last seven days, and prints what the week cost. Set `SLACK_WEBHOOK_URL` and it posts the report too. Pick your language; all three were run against the demo store and produce the same document.
+
+<Tabs labels={["Python", "TypeScript", "Go"]} storageKey="sdk">
+<div>
+
+```python
+# report.py: a weekly product feedback report from the reviews table.
+import os, sys, urllib.request, json
+from jevql import Jevql
+
+DAYS = 7
+THEMES = ["quality or durability", "shipping or delivery", "price or value", "size or fit", "not as described", "no complaint"]
+def arr(xs): return "ARRAY[" + ", ".join(f"'{x}'" for x in xs) + "]"
+
+MIX = f"""
+SELECT jev_choice((r.title, r.body), 'What is the main complaint in this review?', {arr(THEMES)}) AS theme, count(*) AS n
+FROM reviews r
+WHERE r.stars <= 3 AND r.created_at > now() - interval '{DAYS} days'
+GROUP BY 1 ORDER BY 2 DESC"""
+
+BROKEN = f"""
+SELECT p.name, count(*) AS n
+FROM reviews r JOIN products p ON p.id = r.product_id
+WHERE r.created_at > now() - interval '{DAYS} days'
+  AND jev((r.title, r.body), 'the product broke, wore out or stopped working')
+GROUP BY 1 ORDER BY 2 DESC LIMIT 5"""
+
+REPLY = f"""
+SELECT r.id, c.name AS customer, c.email, p.name AS product, left(r.body, 80) AS body
+FROM reviews r JOIN products p ON p.id = r.product_id JOIN customers c ON c.id = r.customer_id
+WHERE r.stars <= 2 AND r.created_at > now() - interval '{DAYS} days'
+  AND jev((r.title, r.body), 'the reviewer describes a defect or a wrong item and would want the seller to follow up', 0.7)
+ORDER BY r.created_at DESC"""
+
+with Jevql() as db:
+    mix, broken, reply = (db.query(q) for q in (MIX, BROKEN, REPLY))
+
+usd = mix.stats.usd + broken.stats.usd + reply.stats.usd
+out = [f"# Product feedback, last {DAYS} days", "", "## What people complain about"]
+out += [f"- {theme}: {n}" for theme, n in mix.rows]
+out += ["", "## Products reported as broken"] + [f"- {name}: {n}" for name, n in broken.rows]
+out += ["", f"## Reviews that need a reply ({reply.row_count})"]
+out += [f"- #{id} {customer} <{email}> on {product}: {body}" for id, customer, email, product, body in reply.rows]
+out += ["", f"_{mix.stats.judged + broken.stats.judged + reply.stats.judged} reviews judged, ${usd:.4f}_"]
+report = "\n".join(out)
+
+print(report)
+if hook := os.environ.get("SLACK_WEBHOOK_URL"):     # optional: post it
+    urllib.request.urlopen(urllib.request.Request(hook, json.dumps({"text": report}).encode(), {"Content-Type": "application/json"}))
+```
+
+</div>
+<div>
+
+```ts
+// report.ts: a weekly product feedback report from the reviews table.
+import { Jevql } from "jevql"
+
+const DAYS = 7
+const THEMES = ["quality or durability", "shipping or delivery", "price or value", "size or fit", "not as described", "no complaint"]
+const arr = (xs: string[]) => `ARRAY[${xs.map((x) => `'${x}'`).join(", ")}]`
+
+const MIX = `
+SELECT jev_choice((r.title, r.body), 'What is the main complaint in this review?', ${arr(THEMES)}) AS theme, count(*) AS n
+FROM reviews r
+WHERE r.stars <= 3 AND r.created_at > now() - interval '${DAYS} days'
+GROUP BY 1 ORDER BY 2 DESC`
+
+const BROKEN = `
+SELECT p.name, count(*) AS n
+FROM reviews r JOIN products p ON p.id = r.product_id
+WHERE r.created_at > now() - interval '${DAYS} days'
+  AND jev((r.title, r.body), 'the product broke, wore out or stopped working')
+GROUP BY 1 ORDER BY 2 DESC LIMIT 5`
+
+const REPLY = `
+SELECT r.id, c.name AS customer, c.email, p.name AS product, left(r.body, 80) AS body
+FROM reviews r JOIN products p ON p.id = r.product_id JOIN customers c ON c.id = r.customer_id
+WHERE r.stars <= 2 AND r.created_at > now() - interval '${DAYS} days'
+  AND jev((r.title, r.body), 'the reviewer describes a defect or a wrong item and would want the seller to follow up', 0.7)
+ORDER BY r.created_at DESC`
+
+const db = new Jevql()
+const [mix, broken, reply] = await Promise.all([MIX, BROKEN, REPLY].map((q) => db.query(q)))
+await db.close()
+
+const usd = mix.stats.usd + broken.stats.usd + reply.stats.usd
+const judged = mix.stats.judged + broken.stats.judged + reply.stats.judged
+const report = [
+  `# Product feedback, last ${DAYS} days`, "", "## What people complain about",
+  ...mix.rows.map(([theme, n]) => `- ${theme}: ${n}`),
+  "", "## Products reported as broken",
+  ...broken.rows.map(([name, n]) => `- ${name}: ${n}`),
+  "", `## Reviews that need a reply (${reply.row_count})`,
+  ...reply.rows.map(([id, customer, email, product, body]) => `- #${id} ${customer} <${email}> on ${product}: ${body}`),
+  "", `_${judged} reviews judged, $${usd.toFixed(4)}_`,
+].join("\n")
+
+console.log(report)
+if (process.env.SLACK_WEBHOOK_URL)     // optional: post it
+  await fetch(process.env.SLACK_WEBHOOK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: report }) })
+```
+
+</div>
+<div>
+
+```go
+// report.go: a weekly product feedback report from the reviews table.
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+
+	jevql "github.com/kylemclaren/jevql/sdk/go"
+)
+
+const days = 7
+
+var themes = []string{"quality or durability", "shipping or delivery", "price or value", "size or fit", "not as described", "no complaint"}
+
+func arr(xs []string) string { return "ARRAY['" + strings.Join(xs, "', '") + "']" }
+
+func main() {
+	ctx := context.Background()
+	db, err := jevql.New(ctx, jevql.Options{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close(ctx)
+
+	mix := fmt.Sprintf(`SELECT jev_choice((r.title, r.body), 'What is the main complaint in this review?', %s) AS theme, count(*) AS n
+FROM reviews r
+WHERE r.stars <= 3 AND r.created_at > now() - interval '%d days'
+GROUP BY 1 ORDER BY 2 DESC`, arr(themes), days)
+	broken := fmt.Sprintf(`SELECT p.name, count(*) AS n
+FROM reviews r JOIN products p ON p.id = r.product_id
+WHERE r.created_at > now() - interval '%d days'
+  AND jev((r.title, r.body), 'the product broke, wore out or stopped working')
+GROUP BY 1 ORDER BY 2 DESC LIMIT 5`, days)
+	reply := fmt.Sprintf(`SELECT r.id, c.name AS customer, c.email, p.name AS product, left(r.body, 80) AS body
+FROM reviews r JOIN products p ON p.id = r.product_id JOIN customers c ON c.id = r.customer_id
+WHERE r.stars <= 2 AND r.created_at > now() - interval '%d days'
+  AND jev((r.title, r.body), 'the reviewer describes a defect or a wrong item and would want the seller to follow up', 0.7)
+ORDER BY r.created_at DESC`, days)
+
+	var b strings.Builder
+	usd, judged := 0.0, 0
+	section := func(title, sql string, line func(r []any) string) {
+		res, err := db.Query(ctx, sql)
+		if err != nil {
+			log.Fatal(err)
+		}
+		usd += res.Stats.USD
+		judged += res.Stats.Judged
+		fmt.Fprintf(&b, "\n## %s\n", title)
+		for _, r := range res.Rows {
+			fmt.Fprintln(&b, "- "+line(r))
+		}
+	}
+	fmt.Fprintf(&b, "# Product feedback, last %d days\n", days)
+	section("What people complain about", mix, func(r []any) string { return fmt.Sprintf("%v: %v", r[0], r[1]) })
+	section("Products reported as broken", broken, func(r []any) string { return fmt.Sprintf("%v: %v", r[0], r[1]) })
+	section("Reviews that need a reply", reply, func(r []any) string { return fmt.Sprintf("#%v %v <%v> on %v: %v", r[0], r[1], r[2], r[3], r[4]) })
+	fmt.Fprintf(&b, "\n_%d reviews judged, $%.4f_\n", judged, usd)
+
+	fmt.Print(b.String())
+	if hook := os.Getenv("SLACK_WEBHOOK_URL"); hook != "" { // optional: post it
+		body, _ := json.Marshal(map[string]string{"text": b.String()})
+		http.Post(hook, "application/json", bytes.NewReader(body))
+	}
+}
+```
+
+</div>
+</Tabs>
+
+```markdown
+# Product feedback, last 7 days
+
+## What people complain about
+- quality or durability: 6
+- size or fit: 4
+- no complaint: 4
+- not as described: 2
+- shipping or delivery: 2
+
+## Products reported as broken
+- Yoga mat: 2
+- Puzzle: 1000 pieces: 1
+- Cast iron skillet: 1
+- Bike lights set: 1
+- Cold brew kit: 1
+
+## Reviews that need a reply (9)
+- #46 Cléo Baker <cleo.baker451@example.com> on Kids' rain jacket: Terrible. the cable is too short. Asked for a refund and got silence.
+- #2883 Emma Ito <emma.ito694@example.com> on Cold brew kit: Broke after 48 days. it wobbles on my desk. Avoid.
+- #682 Rosa Nguyen <rosa.nguyen1464@example.com> on Puzzle: 1000 pieces: Disappointed. the lid does not seal properly. Considering returning it.
+- #2879 Noah Costa <noah.costa1220@example.com> on Noise-cancelling earbuds: Terrible. the lid does not seal properly. Asked for a refund and got silence.
+- #2049 Jonas Lindqvist <jonas.lindqvist1614@example.com> on Cast iron skillet: the stitching came loose. For this price I expected better.
+- #976 Carlos Sato <carlos.sato762@example.com> on Puzzle: 1000 pieces: Arrived damaged and customer service made it worse.
+- #2286 Uma Silva <uma.silva1427@example.com> on Bike lights set: Arrived damaged and customer service made it worse.
+- #338 Inês Hoffmann <ines.hoffmann1139@example.com> on Yoga mat: Terrible. the stitching came loose. Asked for a refund and got silence.
+- #1498 Omar Silva <omar.silva720@example.com> on Yoga mat: the stitching came loose. For this price I expected better.
+
+_82 reviews judged, $0.0004_
+```
+
+The first run judged 82 reviews for $0.0004. Run it again next week and only the new reviews are judged: the cache key is the question plus the row content, and last week's reviews have not changed. Widen `DAYS` to 30 for a monthly view and you still only pay for reviews the job has not seen.
+
+## Where to go next
+
+- Add a tone column to the reply list, `jev_score((r.title, r.body), 'How angry is the reviewer?', ARRAY['calm','annoyed','furious'])`, and sort by it so the angriest customers are answered first.
+- Compare the complaint mix across categories: group by `p.category` and the theme, and see whether "size or fit" is an apparel problem or a catalog-wide one.
+- Feed the reply list into the [ticket triage](/docs/cookbook/ticket-triage/) job: a review that needs a follow-up is a support ticket that nobody filed.
+- Run the report from a shared node so the whole team shares one cache: `Jevql(url=..., token=...)`. See [Deploy a node](/docs/deploy/).
