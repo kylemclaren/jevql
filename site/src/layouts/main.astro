@@ -1,0 +1,36 @@
+---
+import "@/styles/global.css"
+import "@/styles/openjev.css"
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const {
+  title = "jevQL — semantic SQL for vanilla Postgres",
+  description = "A psql-shaped CLI that evaluates jev() with TypeSafe. The database only ever sees plain SQL. No extension, no proxy.",
+} = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20,600,0,0&icon_names=bolt,celebration,check,content_copy,database,download,lock,play_arrow,terminal&display=block"
+    />
+    <title>{title}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

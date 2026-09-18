@@ -1,0 +1,169 @@
+---
+import Layout from "@/layouts/main.astro"
+
+const repo = "https://github.com/kylemclaren/jevql"
+const install = "brew install kylemclaren/tap/jevql"
+---
+
+<Layout>
+  <main class="page">
+    <header class="mast">
+      <a class="brand" href="./">jevql</a>
+      <div class="mast-right">
+        <span class="tagline">Semantic WHERE clauses for vanilla Postgres. No extension.</span>
+        <a class="repo-link" href={repo}>GitHub repo ↗</a>
+      </div>
+    </header>
+
+    <section class="hero">
+      <p class="eyebrow">A psql-shaped CLI</p>
+      <h1>Ask your database <mark>a real question.</mark></h1>
+      <p class="lede">
+        <code>jevql</code> is a Go client that speaks psql. Write <code>WHERE jev(people, 'could work from home')</code>
+        and it runs the SQL parts on Postgres, judges the rows with TypeSafe's Jev model, and prints an aligned table.
+        The server only ever sees ordinary SQL.
+      </p>
+      <div class="truth-strip">
+        <span>no extension</span><span>no proxy</span><span>vanilla postgres</span><span>cached answers</span><span>$0.042 / M tokens</span>
+      </div>
+      <div class="waitlist-joke">
+        <button id="copy-install" type="button" data-copy={install}>
+          <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
+        </button>
+        <p role="status">
+          <span class="material-symbols-rounded" aria-hidden="true">celebration</span>
+          <strong>There is no waitlist!</strong> brew it and go ↓
+        </p>
+      </div>
+      <p class="device-note">Needs a Postgres you can already connect to and a TypeSafe API key. First launch asks for both.</p>
+    </section>
+
+    <section class="workbench" aria-labelledby="query-title">
+      <div class="section-head">
+        <div><p class="eyebrow">00 / query</p><h2 id="query-title">It looks like SQL because it is SQL</h2></div>
+        <a class="repo-link" href={`${repo}#sql-surface`}>full SQL surface ↗</a>
+      </div>
+      <div class="race">
+        <article class="lane direct">
+          <div class="lane-head"><div><p class="eyebrow">you type</p><h2>jev() in WHERE</h2></div><span class="badge">boolean</span></div>
+          <p class="explain">Cheap, indexed predicates stay in SQL. The semantic one becomes a calibrated probability against a threshold.</p>
+          <pre class="output">SELECT name, city,
+       jev_prob(people, 'could work from home') AS p
+FROM people
+WHERE jev(people, 'could work from home')
+  AND country = 'PT'
+ORDER BY p DESC
+LIMIT 20;</pre>
+          <dl class="metrics">
+            <div><dt>runs on</dt><dd>postgres + jev</dd></div>
+            <div><dt>row filter</dt><dd>country = 'PT'</dd></div>
+            <div><dt>judged</dt><dd>only survivors</dd></div>
+          </dl>
+        </article>
+        <article class="lane generated">
+          <div class="lane-head"><div><p class="eyebrow">you get</p><h2>A psql table</h2></div><span class="badge pink">aligned</span></div>
+          <p class="explain">Same output shapes as psql: aligned, expanded, CSV or JSON. Plus a footer with tokens and cost.</p>
+          <pre class="output">     name      |  city  |  p
+---------------+--------+------
+ Miguel Costa  | Lisbon | 0.94
+ Ada Fernandes | Lisbon | 0.93
+ Pedro Martins | Lisbon | 0.91
+(3 rows)
+jev: 6 judged, 1 req, 0 cache hits, 1.2k in tokens, $0.0001, 1.35s</pre>
+          <dl class="metrics">
+            <div><dt>formats</dt><dd>table · \x · csv · json</dd></div>
+            <div><dt>repl</dt><dd>\d \dt \timing</dd></div>
+            <div><dt>exit codes</dt><dd>0 · 1 sql · 2 api</dd></div>
+            <div><dt>second run</dt><dd>0 requests</dd></div>
+          </dl>
+        </article>
+      </div>
+      <div class="presets" aria-label="More things it does">
+        <span>Also</span>
+        <button type="button" disabled>jev_choice(t, 'which team?', ARRAY['billing','technical'])</button>
+        <button type="button" disabled>jev_score(p, 'seniority', ARRAY['junior','mid','senior'])</button>
+        <button type="button" disabled>GROUP BY jev_choice(...)</button>
+        <button type="button" disabled>NOT jev(...)</button>
+        <button type="button" disabled>jev((name, bio), '...')</button>
+      </div>
+    </section>
+
+    <section class="method-map" aria-label="How a query is executed">
+      <div class="method-input"><small>your statement</small><strong>SELECT … WHERE jev(alias, 'condition')</strong></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="method-model"><small>jevql, in your terminal</small><strong>parse · rewrite · judge · project</strong></div>
+      <div class="fork" aria-hidden="true">↗<br />↘</div>
+      <div class="method-outputs">
+        <div><small>pass A / postgres</small><strong>plain SQL, jev stripped</strong></div>
+        <div><small>pass B / typesafe</small><strong><i>{"{"}</i><i>rows</i><i> → </i><i>noul 0.94</i><i>{"}"}</i></strong></div>
+      </div>
+    </section>
+
+    <section class="machine" aria-labelledby="install-title">
+      <div class="section-head">
+        <div><p class="eyebrow">01 / install</p><h2 id="install-title">Three ways in, one binary</h2></div>
+      </div>
+      <div class="phases" aria-label="Install options">
+        <div class="phase"><small>homebrew</small><strong>brew install</strong><pre class="output">brew install kylemclaren/tap/jevql</pre></div>
+        <div class="phase"><small>go</small><strong>go install</strong><pre class="output">CGO_ENABLED=1 go install \
+  github.com/kylemclaren/jevql/cmd/jevql@latest</pre></div>
+        <div class="phase"><small>binaries</small><strong>releases</strong><pre class="output">macOS arm64 / x86_64
+Linux amd64 / arm64</pre><span><a href={`${repo}/releases`}>github releases ↗</a></span></div>
+      </div>
+      <p class="fine">
+        Then just type <code>jevql</code>. It prompts for a database URL and a TypeSafe key the first time and saves them to
+        <code>~/.config/jevql/env</code> (mode 0600). Or set <code>DATABASE_URL</code> and <code>TYPESAFE_API_KEY</code> like any psql user would.
+      </p>
+      <div class="model-notice" role="note">
+        <span>Parsing uses libpg_query, the real Postgres parser. No regexes touch your SQL, and anything without <code>jev_*</code> passes straight through.</span>
+      </div>
+    </section>
+
+    <section class="verdict" aria-live="polite">
+      <span>what postgres actually receives</span><strong>SELECT … FROM people WHERE country = 'PT'</strong>
+      <p>jevql keeps every non-jev predicate on the server, adds the columns it needs for row objects, and only judges the rows that come back. ORDER BY and LIMIT are pushed down whenever the collected rows are the final rows.</p>
+    </section>
+
+    <details open>
+      <summary>Read this before pointing it at production</summary>
+      <div class="details-grid">
+        <p><b>Row contents go to TypeSafe.</b> Every column of the judged alias is sent over HTTPS. Use <code>jev((name, bio), …)</code> or <code>--columns</code> to send less, and never use it on data you cannot share.</p>
+        <p><b>It is a full scan of the post-filter set.</b> Put cheap predicates in SQL first. <code>--explain</code> shows the collect SQL, the row count and a cost estimate without making a single API call. <code>--max-rows</code> aborts before HTTP.</p>
+        <p><b>Not a Postgres extension.</b> Apps sending <code>WHERE jev(...)</code> through JDBC will fail; the function exists only inside this CLI. Function names mirror pg-jev so migrating later is a rename, not a rewrite.</p>
+        <p><b>The cache is a local sqlite file.</b> Keyed by model, question and canonical row JSON, created with mode 0600, no expiry in v1. <code>\cache clear</code> or <code>--no-cache</code> exist.</p>
+      </div>
+    </details>
+
+    <footer>
+      <span>jevQL / psql-shaped semantic SQL</span>
+      <span><a href={repo}>GitHub repo</a> · <a href="https://typesafe.ai">TypeSafe</a> · <a href="https://github.com/realZachi/pg-jev">pg-jev</a> · <a href="https://github.com/TheoLeeCJ/openjev">openjev</a></span>
+    </footer>
+  </main>
+
+  <script>
+    const btn = document.getElementById("copy-install")
+    if (btn) {
+      const original = btn.innerHTML
+      btn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy || "")
+          btn.innerHTML = '<span class="material-symbols-rounded" aria-hidden="true">check</span> copied'
+          setTimeout(() => (btn.innerHTML = original), 1400)
+        } catch {
+          /* clipboard unavailable; the text is visible anyway */
+        }
+      })
+    }
+  </script>
+</Layout>
+
+<style is:global>
+  /* page-specific additions on top of the openjev stylesheet */
+  .lede code, .fine code, .model-notice code, .details-grid code { font: inherit; font-weight: 800; font-family: ui-monospace, monospace; }
+  .lede code { font-size: .9em; }
+  .phase .output { margin: 0; padding: 8px 0 0; border: 0; font-size: .66rem; white-space: pre-wrap; }
+  .phase span a { color: inherit; }
+  .presets button:disabled { opacity: 1; filter: none; cursor: default; text-transform: none; }
+  .waitlist-joke button { text-transform: none; }
+  .repo-link { font-size: .65rem; font-weight: 900; text-transform: uppercase; }
+</style>
