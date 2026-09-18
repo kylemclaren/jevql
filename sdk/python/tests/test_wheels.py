@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from jevql import __version__
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import build_wheels  # noqa: E402
