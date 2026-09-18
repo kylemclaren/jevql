@@ -12,14 +12,25 @@ export default function DocsToc({ headings }: { headings: Heading[] }) {
     const els = headings.map((h) => document.getElementById(h.slug)).filter(Boolean) as HTMLElement[]
     if (!els.length) return
     const onScroll = () => {
-      const line = window.scrollY + 120
+      const doc = document.documentElement
+      const atBottom = window.scrollY + window.innerHeight >= doc.scrollHeight - 4
+      if (atBottom) {
+        setActive(els.length - 1)
+        return
+      }
+      // A heading is "current" once it passes a line a quarter of the way down the viewport.
+      const line = window.scrollY + Math.min(160, window.innerHeight * 0.25)
       let i = 0
-      for (let k = 0; k < els.length; k++) if (els[k].offsetTop <= line) i = k
+      for (let k = 0; k < els.length; k++) if (els[k].getBoundingClientRect().top + window.scrollY <= line) i = k
       setActive(i)
     }
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
-    return () => window.removeEventListener("scroll", onScroll)
+    window.addEventListener("resize", onScroll)
+    return () => {
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onScroll)
+    }
   }, [headings])
 
   return (
