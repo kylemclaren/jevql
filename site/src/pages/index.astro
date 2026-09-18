@@ -238,10 +238,10 @@ const install = "brew install kylemclaren/tap/jevql"
     }
     const ua = navigator.userAgent
     const guessOS = /Mac/i.test(ua) ? "darwin" : /Linux|Android/i.test(ua) ? "linux" : ""
-    const guessArch = /arm64|aarch64/i.test(ua) ? "arm64" : "amd64"
-    document.querySelector(`.dl-tile[data-os="${guessOS}"][data-arch="${guessArch}"]`)?.classList.add("likely")
-    // Name the platform on the hero button so it reads as a real download, not a generic install link.
-    const platformName = guessOS === "darwin" ? (guessArch === "arm64" ? "macOS · Apple Silicon" : "macOS · Intel") : guessOS === "linux" ? `Linux · ${guessArch}` : ""
+    // Browsers on Apple Silicon still say "Intel", so never guess the Mac architecture.
+    const guessArch = guessOS === "linux" ? (/arm64|aarch64/i.test(ua) ? "arm64" : "amd64") : ""
+    if (guessArch) document.querySelector(`.dl-tile[data-os="${guessOS}"][data-arch="${guessArch}"]`)?.classList.add("likely")
+    const platformName = guessOS === "darwin" ? "macOS" : guessOS === "linux" ? `Linux · ${guessArch}` : ""
     const label = document.getElementById("dl-label")
     if (label && platformName) label.textContent = `download for ${platformName}`
     fetch("https://api.github.com/repos/kylemclaren/jevql/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
