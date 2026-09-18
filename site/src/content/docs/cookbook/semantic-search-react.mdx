@@ -1,0 +1,205 @@
+---
+title: "Cookbook: semantic search in React"
+description: A search box that takes a plain-English request and returns rows from Postgres, with a small API route in front of jevql.
+section: Cookbook
+order: 40
+---
+
+You will build a `<SemanticSearch>` component. The user types something like *"customers who sound like they are about to churn"*, the component asks your API, the API turns the request into a jevql query, and the rows come back with what the query cost.
+
+The browser never talks to jevql directly. Your API route holds the database URL and the TypeSafe key, and it decides which table and columns are searchable. That keeps the token and the SQL surface on the server.
+
+## What you need
+
+- Node 18+ and a React app with an API route. The example uses a Next.js route handler; an Express handler is shown at the end.
+- `npm i jevql`. The TypeScript SDK bundles the engine, so nothing else to install.
+- A table to search. The example uses `tickets(id, subject, body, status, created_at)`.
+
+<Callout kind="tip">
+Start with `explain` while you tune the SQL filters. It tells you how many rows a request would judge and what it would cost, without calling TypeSafe.
+</Callout>
+
+## 1. The API route
+
+One handler, one shared `Jevql` instance, and a tiny allow-list of what can be searched.
+
+```ts
+// app/api/search/route.ts
+import { Jevql, JevqlError } from "jevql"
+import { NextResponse } from "next/server"
+
+// One engine per server process. It starts on first use and reads
+// DATABASE_URL and TYPESAFE_API_KEY from the environment.
+const db = new Jevql()
+
+// Only these tables, only these columns. The condition is user input;
+// the SQL around it is not.
+const SEARCHABLE = {
+  tickets: { columns: ["subject", "body"], recent: "created_at > now() - interval '90 days'" },
+} as const
+
+type Table = keyof typeof SEARCHABLE
+
+export async function POST(req: Request) {
+  const { table, condition, limit = 20 } = (await req.json()) as { table: Table; condition: string; limit?: number }
+  const spec = SEARCHABLE[table]
+  if (!spec || typeof condition !== "string" || condition.length < 3 || condition.length > 200) {
+    return NextResponse.json({ error: "bad request" }, { status: 400 })
+  }
+
+  // The condition goes in as a SQL string literal. Escape single quotes.
+  const q = condition.replace(/'/g, "''")
+  // Column-list form: only these columns are sent to TypeSafe, and because
+  // jev() and jev_prob() name the same columns, each row is judged once.
+  const src = `(${spec.columns.map((c) => `t.${c}`).join(", ")})`
+  const sql = `
+    SELECT id, subject, jev_prob(${src}, '${q}') AS relevance
+    FROM ${table} t
+    WHERE t.status = 'open' AND t.${spec.recent}
+      AND jev(${src}, '${q}')
+    ORDER BY relevance DESC
+    LIMIT ${Math.min(Number(limit) || 20, 50)}`
+
+  try {
+    const res = await db.query(sql, { maxRows: 500 })   // never judge more than 500 rows per search
+    return NextResponse.json({ columns: res.columns, rows: res.rows, stats: res.stats })
+  } catch (e) {
+    if (e instanceof JevqlError && e.code === "budget") {
+      return NextResponse.json({ error: "Too many matching rows to search. Add a filter." }, { status: 422 })
+    }
+    throw e
+  }
+}
+```
+
+Three things worth noticing:
+
+- The plain predicates (`status = 'open'`, last 90 days) run on Postgres **before** jevql judges anything. Every row that survives them is sent to TypeSafe, so this is where the bill is decided.
+- `jev_prob` gives a relevance score to sort by; `jev` in the outer `WHERE` drops rows under the threshold (0.5 by default, pass `threshold` to change it).
+- `maxRows: 500` is the safety net. If a request would judge more than that, jevql refuses before making any API call and you get a `budget` error to turn into a friendly message.
+
+## 2. The component
+
+```tsx
+// components/SemanticSearch.tsx
+"use client"
+import { useEffect, useRef, useState } from "react"
+
+type Row = [id: number, subject: string, relevance: number]
+type Result = { rows: Row[]; stats: { judged: number; cache_hits: number; usd: number; elapsed_ms: number } | null }
+
+export function SemanticSearch({ table = "tickets" }: { table?: string }) {
+  const [condition, setCondition] = useState("")
+  const [result, setResult] = useState<Result | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const abort = useRef<AbortController | null>(null)
+
+  // Search on submit, not on every keystroke: each search costs money.
+  async function search(e: React.FormEvent) {
+    e.preventDefault()
+    if (condition.trim().length < 3) return
+    abort.current?.abort()
+    const ctl = new AbortController()
+    abort.current = ctl
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ table, condition }),
+        signal: ctl.signal,
+      })
+      const body = await r.json()
+      if (!r.ok) throw new Error(body.error ?? r.statusText)
+      setResult(body)
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => () => abort.current?.abort(), [])
+
+  return (
+    <div className="semantic-search">
+      <form onSubmit={search}>
+        <input
+          value={condition}
+          onChange={(e) => setCondition(e.target.value)}
+          placeholder="Describe what you are looking for, e.g. customers who sound like they will churn"
+          aria-label="Search condition"
+        />
+        <button type="submit" disabled={busy}>{busy ? "Judging…" : "Search"}</button>
+      </form>
+
+      {error && <p role="alert">{error}</p>}
+
+      {result && (
+        <>
+          <ol>
+            {result.rows.map(([id, subject, relevance]) => (
+              <li key={id}>
+                <span className="score">{Math.round(relevance * 100)}%</span> {subject}
+              </li>
+            ))}
+          </ol>
+          {result.rows.length === 0 && <p>No rows matched.</p>}
+          {result.stats && (
+            <p className="footer">
+              {result.stats.judged} rows judged, {result.stats.cache_hits} from cache, ${result.stats.usd.toFixed(4)},{" "}
+              {result.stats.elapsed_ms} ms
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+```
+
+Use it anywhere:
+
+```tsx
+<SemanticSearch table="tickets" />
+```
+
+## 3. Make it feel instant
+
+- **Cache.** jevql caches every judgement by row content and question. The same search twice costs nothing the second time, and two users asking the same thing share the cache. That is why the footer shows `cache_hits`.
+- **Suggested searches.** Offer a few canned conditions as chips (*"angry customer"*, *"asks for a refund"*, *"mentions a competitor"*). They warm the cache and show people what kind of question works.
+- **Do not search on every keystroke.** Submit on Enter or after a long debounce. Each distinct condition is a new set of judgements.
+- **Show the bill.** The `stats` object is free; surfacing it keeps you honest with yourself about what a feature costs.
+
+## 4. Same thing with Express
+
+```ts
+import express from "express"
+import { Jevql } from "jevql"
+
+const app = express()
+const db = new Jevql()
+app.use(express.json())
+
+app.post("/api/search", async (req, res) => {
+  const q = String(req.body.condition ?? "").replace(/'/g, "''")
+  if (q.length < 3) return res.status(400).json({ error: "condition too short" })
+  const out = await db.query(
+    `SELECT id, subject, jev_prob(tickets, '${q}') AS relevance
+     FROM tickets WHERE status = 'open' AND jev((subject, body), '${q}')
+     ORDER BY relevance DESC LIMIT 20`,
+    { maxRows: 500 },
+  )
+  res.json({ columns: out.columns, rows: out.rows, stats: out.stats })
+})
+
+app.listen(3000)
+```
+
+## Where to go next
+
+- Swap `jev` for `jev_choice` to build a **classify** box: *"which team should handle this?"* with fixed options.
+- Point the API route at a shared node instead of an embedded engine: `new Jevql({ url, token })`. See [Deploy a node](/docs/deploy/).
+- For agents rather than people, expose the same table through the [MCP server](/docs/mcp/).

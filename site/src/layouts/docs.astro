@@ -19,7 +19,7 @@ interface Props {
 const { title, description, headings = [], id } = Astro.props
 const repo = "https://github.com/kylemclaren/jevql"
 const all = (await getCollection("docs", (e) => !e.data.draft)).sort((a, b) => a.data.order - b.data.order)
-const sections = ["Start", "Use", "Integrate", "Reference"] as const
+const sections = ["Start", "Use", "Integrate", "Cookbook", "Reference"] as const
 const groups = sections
   .map((label) => ({
     label,
