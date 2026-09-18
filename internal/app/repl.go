@@ -128,6 +128,7 @@ Meta commands:
   \x [on|off]       expanded output    \d [name]          describe
   \dt \dn \l        tables/schemas/dbs \set JEV_THRESHOLD 0.7
   \cache [stats|clear]                 \explain <query>   plan, no HTTP
+  \set TYPESAFE_API_KEY tsk_...        \set JEV_MODEL jev-preview
   \i file           run a file         help               this text
 `)
 }
@@ -181,6 +182,9 @@ func (s *session) meta(ctx context.Context, line string) (bool, error) {
 				return false, fmt.Errorf("JEV_THRESHOLD must be a number between 0 and 1")
 			}
 			s.ex.Opts.Threshold = f
+		case "TYPESAFE_API_KEY":
+			s.setAPIKey(val)
+			fmt.Fprintln(s.ui.out, "TypeSafe API key set.")
 		case "JEV_MODEL":
 			s.ex.TS.Model = val
 			s.ex.Opts.Model = val

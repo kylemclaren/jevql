@@ -2,6 +2,7 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/term"
@@ -163,8 +165,72 @@ func splitArgs(fs *flag.FlagSet, args []string) (flags, positional []string) {
 	return flags, positional
 }
 
+// configPath is ~/.config/jevpsql/env: KEY=VALUE lines used as defaults
+// for environment variables that are not already set.
+func configPath() string {
+	if p := os.Getenv("JEVPSQL_CONFIG"); p != "" {
+		return p
+	}
+	base, err := os.UserConfigDir()
+	if err != nil || base == "" {
+		base = filepath.Join(os.Getenv("HOME"), ".config")
+	}
+	return filepath.Join(base, "jevpsql", "env")
+}
+
+// loadConfigFile applies saved defaults to the environment.
+func loadConfigFile() {
+	data, err := os.ReadFile(configPath())
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		k, v = strings.TrimSpace(k), strings.Trim(strings.TrimSpace(v), "'\"")
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
+}
+
+// saveConfigFile writes KEY=VALUE pairs with mode 0600.
+func saveConfigFile(kv map[string]string) error {
+	path := configPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	existing := map[string]string{}
+	if data, err := os.ReadFile(path); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			if k, v, ok := strings.Cut(line, "="); ok {
+				existing[strings.TrimSpace(k)] = strings.TrimSpace(v)
+			}
+		}
+	}
+	for k, v := range kv {
+		existing[k] = v
+	}
+	var b strings.Builder
+	b.WriteString("# jevpsql defaults; environment variables override these.\n")
+	for k, v := range existing {
+		fmt.Fprintf(&b, "%s=%s\n", k, v)
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o600)
+}
+
 // Main runs the CLI and returns the exit code.
 func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
+	// Never query the terminal for its background colour (OSC 11); it blocks
+	// on terminals that do not answer and we do not need it.
+	lipgloss.SetHasDarkBackground(true)
+	loadConfigFile()
 	cfg, err := parseFlags(args, stderr)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -182,6 +248,36 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 	u := &ui{out: stdout, err: stderr, color: isTerminal(stdout), colorErr: isTerminal(stderr)}
 	if cfg.CSV || cfg.JSON {
 		u.color = false
+	}
+	interactive := isTerminal(stdin) && cfg.Command == "" && cfg.File == ""
+	toSave := map[string]string{}
+	if interactive && !hasConnectionInfo(cfg) {
+		fmt.Fprintln(stderr, u.style(dimStyle, "No database configured (use a postgres:// URL, -h/-d flags, DATABASE_URL or PG* env).", u.colorErr))
+		url, err := promptLine(stdin, stderr, u.style(accentStyle, "Database URL: ", u.colorErr))
+		if err != nil || url == "" {
+			u.errorf("no database URL given")
+			return ExitSQL
+		}
+		cfg.Positional = append(cfg.Positional, url)
+		toSave["DATABASE_URL"] = url
+	}
+	if interactive && cfg.APIKey == "" && !cfg.Explain {
+		fmt.Fprintln(stderr, u.style(dimStyle, "No TypeSafe API key found (TYPESAFE_API_KEY or --api-key). It is needed only for jev() queries.", u.colorErr))
+		key, err := promptSecret(stdin, stderr, u.style(accentStyle, "TypeSafe API key (Enter to skip): ", u.colorErr))
+		if err == nil && key != "" {
+			cfg.APIKey = key
+			toSave["TYPESAFE_API_KEY"] = key
+		}
+	}
+	if len(toSave) > 0 {
+		ans, _ := promptLine(stdin, stderr, u.style(accentStyle, "Save these to "+configPath()+" for next time? [y/N] ", u.colorErr))
+		if strings.HasPrefix(strings.ToLower(ans), "y") {
+			if err := saveConfigFile(toSave); err != nil {
+				u.warnf("could not save config: %v", err)
+			} else {
+				u.notef("saved (mode 0600); delete the file or set the env vars to change them")
+			}
+		}
 	}
 	s, err := newSession(ctx, cfg, u, stdin)
 	if err != nil {
@@ -309,6 +405,28 @@ func (s *session) close() {
 	}
 }
 
+// promptLine asks for a visible value on the terminal.
+func promptLine(stdin *os.File, stderr io.Writer, label string) (string, error) {
+	fmt.Fprint(stderr, label)
+	r := bufio.NewReader(stdin)
+	line, err := r.ReadString('\n')
+	if err != nil && line == "" {
+		return "", err
+	}
+	return strings.TrimSpace(line), nil
+}
+
+// promptSecret asks for a hidden value on the terminal.
+func promptSecret(stdin *os.File, stderr io.Writer, label string) (string, error) {
+	fmt.Fprint(stderr, label)
+	b, err := term.ReadPassword(int(stdin.Fd()))
+	fmt.Fprintln(stderr)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(b)), nil
+}
+
 func promptPassword(stdin *os.File, stderr io.Writer) (string, error) {
 	fmt.Fprint(stderr, "Password: ")
 	b, err := term.ReadPassword(int(stdin.Fd()))
@@ -386,6 +504,19 @@ func buildConnConfig(cfg *Config) (*pgx.ConnConfig, error) {
 		}
 	}
 	return c, nil
+}
+
+// hasConnectionInfo reports whether anything tells us where the database is.
+func hasConnectionInfo(cfg *Config) bool {
+	if len(cfg.Positional) > 0 || cfg.Host != "" || cfg.DBName != "" || cfg.User != "" || cfg.Port != "" {
+		return true
+	}
+	for _, k := range []string{"DATABASE_URL", "PGHOST", "PGDATABASE", "PGSERVICE"} {
+		if os.Getenv(k) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // exitFor maps an error to an exit code.
@@ -474,6 +605,12 @@ func (s *session) runStatement(ctx context.Context, sql string) error {
 		needsJev = true
 	}
 	if needsJev && !s.cfg.Explain {
+		if s.cfg.APIKey == "" && s.interactive {
+			key, err := promptSecret(s.stdin, s.ui.err, s.ui.style(accentStyle, "TypeSafe API key: ", s.ui.colorErr))
+			if err == nil && key != "" {
+				s.setAPIKey(key)
+			}
+		}
 		if s.cfg.APIKey == "" {
 			err := &typesafe.APIError{Status: 0, Body: "no API key: set TYPESAFE_API_KEY or pass --api-key"}
 			s.ui.errorf("%v", err)
@@ -514,6 +651,11 @@ func (s *session) runStatement(ctx context.Context, sql string) error {
 		fmt.Fprintf(s.ui.out, "Time: %.3f ms\n", float64(elapsed.Microseconds())/1000)
 	}
 	return nil
+}
+
+func (s *session) setAPIKey(key string) {
+	s.cfg.APIKey = key
+	s.ex.TS.APIKey = key
 }
 
 func (s *session) printError(err error) {

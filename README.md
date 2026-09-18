@@ -41,6 +41,13 @@ jevpsql --explain -c "..."               # plan + cost estimate, no API calls
 jevpsql "postgres://..." -c "SELECT 1"   # plain statements pass straight through
 ```
 
+Run `jevpsql` with nothing configured and it asks for a database URL and a
+TypeSafe API key (hidden input) and offers to save them to
+`~/.config/jevpsql/env` (mode `0600`). That file holds `KEY=VALUE` lines and
+only fills in environment variables that are not already set, so exported
+variables and flags always win. `TYPESAFE_API_URL` can be added there too.
+Inside the REPL, `\set TYPESAFE_API_KEY tsk_...` sets the key for the session.
+
 Statements without `jev_*` are sent to Postgres unchanged. Any psql
 connection style works: a URI, `-h/-p/-U/-d`, `PG*` environment variables, or
 `DATABASE_URL`.
@@ -155,8 +162,10 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
   column list you give) is sent over HTTPS to the API. Do not use this on
   data you cannot share with TypeSafe. Use the column-list form or
   `--columns` to send the minimum.
-- The API key comes from `TYPESAFE_API_KEY` or `--api-key` and is never
-  printed. Point `--api-url` at a proxy if your environment injects
+- The API key comes from `TYPESAFE_API_KEY`, `--api-key`, the interactive
+  prompt, or `~/.config/jevpsql/env`, and is never printed. The saved config
+  file stores the key and the database URL (including its password) in plain
+  text with mode `0600`; delete it if that is not acceptable. Point `--api-url` at a proxy if your environment injects
   credentials.
 - This is **not** a Postgres extension. The server never learns `jev()`; if
   you send `WHERE jev(...)` through psql or JDBC it will fail with
