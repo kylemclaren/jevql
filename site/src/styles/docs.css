@@ -110,8 +110,10 @@ a.card:hover { background: var(--lime); box-shadow: 3px 3px 0 var(--ink); }
   .docs-sidebar > div { width: 100% !important; }
   .docs-sidebar[data-sidebar-collapsed="true"] { height: 48px; overflow: hidden; }
   .docs-sidebar[data-sidebar-collapsed="true"] .sidebar-copy { display: none; }
-  .docs-sidebar[data-sidebar-collapsed="true"]::after { content: "pages"; position: absolute; left: 44px; top: 14px; font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-  .docs-mast { width: calc(100% - 20px); }
+  .docs-sidebar { margin-bottom: 8px; }
+  .docs-sidebar[data-sidebar-collapsed="true"]::after { content: "pages"; position: absolute; left: 48px; top: 17px; line-height: 1; font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+  .docs-mast { width: calc(100% - 20px); flex-direction: row; align-items: center; }
+  .docs-mast .mast-right { width: auto; flex-direction: row; gap: 8px; }
   .doc-pager { grid-template-columns: 1fr; }
 }
 
