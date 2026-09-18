@@ -1,0 +1,1 @@
+SELECT p.id AS __jev_s0_0, p.name AS __jev_s0_1, p.city AS __jev_s0_2, p.country AS __jev_s0_3, p.job_title AS __jev_s0_4, p.bio AS __jev_s0_5, *, NULL::int AS __jev_sep FROM people p JOIN cities c ON c.name = p.city WHERE c.country = 'PT'
