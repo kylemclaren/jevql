@@ -3,6 +3,8 @@ import Layout from "@/layouts/main.astro"
 import Mark from "@/mark.svg"
 import Tabs from "@/components/docs/Tabs.astro"
 import { Code } from "astro:components"
+import { siClaude, siCursor, siOpencode } from "simple-icons"
+import agentPrompt from "../../public/llms.txt?raw"
 
 const goExample = `client, _ := jevql.New(ctx, jevql.Options{DatabaseURL: os.Getenv("DATABASE_URL")})
 defer client.Close(ctx)
@@ -18,9 +20,30 @@ const db = new Jevql() // bundled engine, reads DATABASE_URL and TYPESAFE_API_KE
 const tickets = await db.queryObjects(\`
   SELECT id, subject FROM tickets
   WHERE jev(tickets, 'is about billing') AND status = 'open'\`)`
-const mcpExample = `claude mcp add jevql -- jevql mcp        # Claude Code, on stdio
-# or any MCP client, over HTTP, against a shared node:
-# https://your-node.fly.dev/mcp  +  Authorization: Bearer <token>`
+const mcpClaude = `# local, on stdio
+claude mcp add jevql -- jevql mcp
+
+# a shared node over HTTP
+claude mcp add --transport http jevql https://your-node.fly.dev/mcp \\
+  --header "Authorization: Bearer $JEVQL_TOKEN"`
+const mcpOpenAI = `# Codex CLI
+codex mcp add jevql -- jevql mcp
+
+# ChatGPT: Settings → Connectors → add an MCP server
+#   URL    https://your-node.fly.dev/mcp
+#   Auth   Bearer <your JEVQL_TOKEN>`
+const mcpCursor = `// .cursor/mcp.json (project) or ~/.cursor/mcp.json (global)
+{
+  "mcpServers": {
+    "jevql": { "command": "jevql", "args": ["mcp"] }
+  }
+}`
+const mcpOpencode = `// opencode.json
+{
+  "mcp": {
+    "jevql": { "type": "local", "command": ["jevql", "mcp"], "enabled": true }
+  }
+}`
 const pyExample = `from jevql import Jevql
 
 with Jevql() as db:  # bundled engine; Jevql(url=...) for a shared one
@@ -62,6 +85,12 @@ const install = "brew install kylemclaren/tap/jevql"
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
       </div>
+      <p class="agent-prompt">
+        <button class="copy prompt-btn" type="button" data-copy={agentPrompt}>
+          <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> copy prompt for your AI agent
+        </button>
+        <span>Paste it into Claude, ChatGPT or Cursor and it knows how to install jevql, write jev() queries and wire the SDKs. Same text at <a href="/llms.txt">/llms.txt</a>.</span>
+      </p>
       <div class="truth-strip">
         <span>works on any postgres</span><span>no extension</span><span>no proxy</span><span>answers cached</span><span>$0.042 / M tokens</span>
       </div>
@@ -163,7 +192,12 @@ const install = "brew install kylemclaren/tap/jevql"
         <code>judge</code> scores rows the agent already holds, and <code>list_tables</code> / <code>describe_table</code> let it find its way around.
         Read-only by default.
       </p>
-      <Code code={mcpExample} lang="bash" theme="github-light" />
+      <Tabs labels={["Claude Code", "OpenAI", "Cursor", "OpenCode"]} icons={[siClaude.path, undefined, siCursor.path, siOpencode.path]} storageKey="landing-mcp">
+        <div><Code code={mcpClaude} lang="bash" theme="github-light" /><p class="fine">Reads <code>DATABASE_URL</code> and <code>TYPESAFE_API_KEY</code> from your shell, like the CLI.</p></div>
+        <div><Code code={mcpOpenAI} lang="bash" theme="github-light" /><p class="fine">ChatGPT only speaks to remote servers, so point it at a <a href="/docs/deploy/">node</a>. Codex runs the local one.</p></div>
+        <div><Code code={mcpCursor} lang="json" theme="github-light" /><p class="fine">Enable it under Settings → MCP. Ask Cursor to "list the tables and find open tickets that sound angry".</p></div>
+        <div><Code code={mcpOpencode} lang="json" theme="github-light" /><p class="fine">Restart OpenCode; the five tools show up under <code>jevql_*</code>.</p></div>
+      </Tabs>
       <div class="phases mcp-tools" aria-label="MCP tools">
         <div class="phase"><small>query</small><strong>Semantic SQL</strong><span>"Which open tickets sound like churn risks?" becomes <code>WHERE jev(t, '…')</code> and comes back as rows.</span></div>
         <div class="phase"><small>explain</small><strong>Price first</strong><span>Rows after filters, batches, tokens and dollars, with no TypeSafe call. Agents check before they spend.</span></div>
@@ -468,6 +502,8 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
     .mast .tagline { display: none; }
     .mast .repo-link { padding: 6px 8px; font-size: .6rem; }
     .install-cta { display: none; }
+    .agent-prompt { margin-top: 4px; }
+    .agent-prompt span { display: none; }
     .truth-strip { margin-top: 8px; }
     .copy-btn { display: none; }
   }
@@ -520,6 +556,15 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .copy-btn:active:not(:disabled) { transform: none; box-shadow: none; }
   .phase .copy-wrap { margin-top: 8px; }
   .phase .copy-wrap > pre { margin: 0; }
+
+  /* copy-prompt line under the hero buttons */
+  .agent-prompt { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0 0; font-size: .74rem; color: var(--muted); }
+  .agent-prompt .prompt-btn { padding: 9px 12px; background: #fff; box-shadow: 2px 2px 0 var(--ink); font-size: .62rem; text-transform: uppercase; }
+  .agent-prompt .prompt-btn:hover { background: var(--lime); }
+  .agent-prompt a { color: inherit; }
+  .mcp .doc-tabs { margin: 0 0 16px; }
+  .tab-icon { margin-right: 6px; vertical-align: -2px; }
+  .mcp .doc-tab { display: inline-flex; align-items: center; }
 
   /* mcp section */
   .mcp-lede { max-width: 820px; margin: 0 0 14px; font: 500 .98rem/1.55 Arial, sans-serif; }

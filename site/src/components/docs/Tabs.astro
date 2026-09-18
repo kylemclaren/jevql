@@ -1,13 +1,15 @@
 ---
 /* Tabs without a framework: every child <div> is a panel, in label order. */
-interface Props { labels: string[]; storageKey?: string }
-const { labels, storageKey } = Astro.props
+interface Props { labels: string[]; storageKey?: string; icons?: (string | undefined)[] }
+const { labels, storageKey, icons = [] } = Astro.props
 const id = "tabs-" + Math.random().toString(36).slice(2, 8)
 ---
 <div class="doc-tabs" data-tabs data-key={storageKey} id={id}>
   <div role="tablist" class="doc-tablist">
     {labels.map((l, i) => (
-      <button type="button" role="tab" class="doc-tab" aria-selected={i === 0 ? "true" : "false"} aria-controls={`${id}-p${i}`} data-index={i}>{l}</button>
+      <button type="button" role="tab" class="doc-tab" aria-selected={i === 0 ? "true" : "false"} aria-controls={`${id}-p${i}`} data-index={i}>
+        {icons[i] && <svg class="tab-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d={icons[i]} /></svg>}{l}
+      </button>
     ))}
   </div>
   <div class="doc-tabpanels"><slot /></div>

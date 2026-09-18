@@ -1,0 +1,32 @@
+# jevql
+
+> A psql-shaped CLI, SDKs and MCP server that add semantic functions to any vanilla PostgreSQL.
+> Write `WHERE jev(alias, 'plain-English condition')`. Postgres runs the ordinary SQL; jevql judges
+> the surviving rows with TypeSafe's Jev model, caches every answer, and applies filter/sort/group.
+> No extension, no proxy, nothing installed on the database server.
+
+## Install
+- macOS/Linux: `brew install kylemclaren/tap/jevql`  or  `curl -fsSL https://jevql.fly.dev/install.sh | sh`
+- Go: `CGO_ENABLED=1 go install github.com/kylemclaren/jevql/cmd/jevql@latest`
+- TypeScript: `npm i jevql` (bundles the engine). Python: `pip install jevql` (bundles the engine). Go SDK: `github.com/kylemclaren/jevql/sdk/go`.
+- Config: `DATABASE_URL` (or PG* vars) and `TYPESAFE_API_KEY`; first launch of `jevql` prompts and saves them to ~/.config/jevql/env.
+
+## SQL surface
+- Row source: a FROM alias (`jev(people, …)`, all columns) or a column list (`jev((name, bio), …)`, only those columns).
+- `jev(src, 'condition' [, threshold])` boolean; `NOT jev(...)` allowed. Default threshold 0.5.
+- `jev_prob(src, 'condition')` float 0..1. `jev_choice(src, 'question', ARRAY['a','b'])` text.
+- `jev_score(src, 'question', ARRAY['lo','mid','hi'])` float weighted level; `jev_score_norm` 0..1.
+- `jev_confidence(src, 'q' [, kind, ARRAY[...]])` float; `jev_eval(...)` raw JSON.
+- Allowed: jev in WHERE as AND terms, in the SELECT list, ORDER BY, GROUP BY with count/sum/avg/min/max, joins.
+- Rejected in v1: jev in CTEs/subqueries/HAVING/window functions, `OR jev(...)`, `jev_prob(...) > x` (use the threshold argument), DISTINCT, set operations.
+- Cost: every row that survives the SQL filters is sent to TypeSafe. Put cheap predicates first. `--explain` (or the explain tool/endpoint) shows rows, batches, tokens and USD with no API call. `--max-rows` (default 2500) aborts before HTTP.
+
+## Interfaces
+- CLI: `jevql -c "SELECT …"`, `jevql -f file.sql`, REPL with \d \dt \timing \x \explain \cache. `--json-table` prints one JSON document per statement.
+- Server: `jevql serve --listen 127.0.0.1:7433 --token T`. Endpoints: POST /v1/query {sql, threshold?, explain?, max_rows?}, POST /v1/judge {question, kind, options?, rows:[{}]}, POST /v1/explain, GET/DELETE /v1/cache, GET /v1/schema/tables[/{name}], GET /openapi.json, POST /mcp (MCP over HTTP). Bearer token on everything but /openapi.json.
+- MCP: `jevql mcp` on stdio (tools: query, explain, judge, list_tables, describe_table; read-only by default). Claude Code: `claude mcp add jevql -- jevql mcp`.
+- SDKs: TS `new Jevql()` / `new Jevql({ url, token })` with query/queryObjects/explain/judge; Python `Jevql()` / `Jevql(url=…)` with query/query_dicts/explain/judge; Go `jevql.New(ctx, jevql.Options{...})` with Query/QueryMaps/Explain/Judge.
+- Deploy a shared node: `fly launch --config deploy/fly.toml` then `fly secrets set DATABASE_URL TYPESAFE_API_KEY JEVQL_TOKEN` and `fly deploy`.
+
+## Links
+- Docs: https://jevql.fly.dev/docs/  Source: https://github.com/kylemclaren/jevql  Protocol: https://github.com/kylemclaren/jevql/blob/main/sdk/PROTOCOL.md
