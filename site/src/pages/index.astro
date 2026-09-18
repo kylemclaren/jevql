@@ -53,7 +53,7 @@ const install = "brew install kylemclaren/tap/jevql"
         in a query: Postgres runs the SQL, Jev judges the rows, you get a psql table. No extension to install, the server only sees plain SQL.
       </p>
       <div class="install-cta">
-        <button id="download" type="button">
+        <button id="download" class="secondary" type="button">
           <span class="material-symbols-rounded" aria-hidden="true">download</span> <span id="dl-label">download jevql</span>
         </button>
         <button class="secondary copy" type="button" data-copy={install}>
@@ -428,7 +428,7 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
 <style is:global>
   code { font: inherit; font-family: ui-monospace, monospace; font-weight: 800; }
   /* inline predicate in the lede: a quiet tinted chip that wraps with the sentence */
-  .hero-snippet { display: inline; background: #ecebe4; border-radius: 3px; padding: .15em .45em .2em; margin: 0 .05em; font: 700 .84em/1.15 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.01em; white-space: normal; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .hero-snippet { display: inline; background: #ecebe4; border-radius: 3px; padding: .15em .5em .2em; margin: 0 .3em; font: 700 .84em/1.15 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.01em; white-space: normal; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .hero-snippet .kw { color: var(--pink); }
   .hero-snippet .fn { background: linear-gradient(transparent 55%, var(--lime) 55%); padding: 0 .1em; }
   .hero-snippet .str { color: var(--muted); }
