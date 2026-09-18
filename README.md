@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/header-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset=".github/readme/header-light.png">
+    <img alt="jevQL: a SQL editor, a terminal and an agent, all pointed at one Postgres, with jev() judging the rows" src=".github/readme/header-light.png" width="100%">
+  </picture>
+</p>
+
 # jevQL
 
 Semantic SQL for **vanilla PostgreSQL**. One extra family of functions, `jev()`, works in any query, from the CLI, from a shared HTTP and MCP node, or from the Go, TypeScript and Python SDKs.
