@@ -9,21 +9,22 @@ A node is `jevql serve` in a container: one HTTP API and one MCP endpoint in fro
 
 <Steps>
 
-### Fly.io
+### Launch it on Fly.io
+
+From a clone of the repository, `fly launch` reads `deploy/fly.toml`, asks for a name and region, creates the app and the cache volume, and deploys:
 
 ```bash
-cp deploy/fly.toml fly.toml && sed -i 's/^app = .*/app = "my-jevql"/' fly.toml
-fly apps create my-jevql
-fly volumes create jevql_data --size 1 --region iad
+git clone https://github.com/kylemclaren/jevql && cd jevql
+fly launch --config deploy/fly.toml --no-deploy
 fly secrets set DATABASE_URL='postgres://user:pass@host:5432/db' \
                 TYPESAFE_API_KEY='tsk_...' \
                 JEVQL_TOKEN="$(openssl rand -hex 32)"
 fly deploy
 ```
 
-Fly terminates TLS at the edge, so the token only travels over HTTPS. The volume keeps the cache across deploys.
+Fly terminates TLS at its edge, so the token only travels over HTTPS. The volume declared in the config keeps the answer cache across deploys.
 
-### Anywhere else
+### Or any container host
 
 ```bash
 docker build -f deploy/Dockerfile -t jevql .
@@ -36,18 +37,18 @@ Put it behind TLS. `jevql serve` refuses a non-loopback address without a token 
 ### Use it
 
 ```bash
-curl -H "Authorization: Bearer $JEVQL_TOKEN" https://my-jevql.fly.dev/v1/health
+curl -H "Authorization: Bearer $JEVQL_TOKEN" https://<your-app>.fly.dev/v1/health
 ```
 
 ```ts
-const db = new Jevql({ url: "https://my-jevql.fly.dev", token: process.env.JEVQL_TOKEN })
+const db = new Jevql({ url: "https://<your-app>.fly.dev", token: process.env.JEVQL_TOKEN })
 ```
 
 ```python
-db = Jevql(url="https://my-jevql.fly.dev", token=os.environ["JEVQL_TOKEN"])
+db = Jevql(url="https://<your-app>.fly.dev", token=os.environ["JEVQL_TOKEN"])
 ```
 
-MCP clients connect to `https://my-jevql.fly.dev/mcp` with the same bearer token. The full API is at `/openapi.json`.
+MCP clients connect to `https://<your-app>.fly.dev/mcp` with the same bearer token. The full API is at `/openapi.json`.
 
 </Steps>
 

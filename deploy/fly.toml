@@ -1,8 +1,7 @@
-# A jevql node on Fly.io. Copy this file, set `app`, then:
-#   fly launch --copy-config --no-deploy      # or: fly apps create <name>
-#   fly volumes create jevql_data --size 1 --region iad
+# A jevql node on Fly.io. From a clone of the repo:
+#   fly launch --config deploy/fly.toml --no-deploy
 #   fly secrets set DATABASE_URL=postgres://... TYPESAFE_API_KEY=tsk_... JEVQL_TOKEN=$(openssl rand -hex 32)
-#   fly deploy --dockerfile deploy/Dockerfile
+#   fly deploy
 # Then from any client:
 #   curl -H "Authorization: Bearer $JEVQL_TOKEN" https://<app>.fly.dev/v1/health
 app = "jevql-node"

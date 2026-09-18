@@ -6,9 +6,7 @@ front of one Postgres, with a shared answer cache, protected by a bearer token.
 ## Fly.io
 
 ```bash
-cp deploy/fly.toml fly.toml && sed -i 's/^app = .*/app = "my-jevql"/' fly.toml
-fly apps create my-jevql
-fly volumes create jevql_data --size 1 --region iad
+fly launch --config deploy/fly.toml --no-deploy   # name, region, app and volume
 fly secrets set DATABASE_URL='postgres://user:pass@host:5432/db' \
                 TYPESAFE_API_KEY='tsk_...' \
                 JEVQL_TOKEN="$(openssl rand -hex 32)"
@@ -16,7 +14,7 @@ fly deploy
 ```
 
 Fly terminates TLS at its edge, so the token only ever travels over HTTPS.
-The volume keeps the answer cache across deploys.
+The volume declared in the config keeps the answer cache across deploys.
 
 ## Anywhere else
 
