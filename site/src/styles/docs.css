@@ -29,7 +29,7 @@ html[data-theme="dark"] .theme-toggle .sun { display: inline; }
 .docs-tag { margin-left: 8px; padding: 3px 6px; background: var(--lime); font-size: .58rem; letter-spacing: .06em; vertical-align: middle; }
 .docs-shell { display: flex; gap: 28px; width: min(1400px, calc(100% - 32px)); margin: 0 auto; padding: 22px 0 60px; align-items: flex-start; }
 .docs-sidebar { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
-.docs-main { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 40px; flex: 1; min-width: 0; }
+.docs-main { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 40px; flex: 1; min-width: 0; }
 .doc-toc { position: sticky; top: 24px; align-self: start; font-family: ui-monospace, monospace; }
 .doc-toc-nav a { text-decoration: none; }
 .doc-crumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; font: 900 .6rem/1 ui-monospace, monospace; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
