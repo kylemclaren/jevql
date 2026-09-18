@@ -1,14 +1,26 @@
 import { OGImageRoute } from "astro-og-canvas"
+import { getCollection } from "astro:content"
 
-// Social card in the hero's look: paper background, ink type, lime accent.
+// Social cards in the hero's look: paper background, ink type, lime accent.
+// One for the landing page, one per docs page.
+const docs = await getCollection("docs", (e) => !e.data.draft)
+
+const pages: Record<string, { title: string; description: string }> = {
+  index: {
+    title: "Ask your database a real question.",
+    description: "WHERE jev(people, 'could work from home')\n\nA psql-shaped CLI for vanilla Postgres. No extension.",
+  },
+}
+for (const e of docs) {
+  pages[`docs/${e.id}`] = {
+    title: e.data.title,
+    description: `jevql docs · ${e.data.section.toLowerCase()}\n\n${e.data.description}`,
+  }
+}
+
 export const { getStaticPaths, GET } = await OGImageRoute({
   param: "route",
-  pages: {
-    index: {
-      title: "Ask your database a real question.",
-      description: "WHERE jev(people, 'could work from home')\n\nA psql-shaped CLI for vanilla Postgres. No extension.",
-    },
-  },
+  pages,
   getImageOptions: (_path, page) => ({
     title: page.title,
     description: page.description,
