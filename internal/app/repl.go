@@ -13,8 +13,8 @@ import (
 	"github.com/ergochat/readline"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/kylemclaren/jevpsql/internal/parse"
-	"github.com/kylemclaren/jevpsql/internal/psqlout"
+	"github.com/kylemclaren/jevql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/psqlout"
 )
 
 func (s *session) repl(ctx context.Context) int {
@@ -34,7 +34,7 @@ func (s *session) repl(ctx context.Context) int {
 		return ExitSQL
 	}
 	defer rl.Close()
-	fmt.Fprintf(s.ui.out, "jevpsql %s (%s)\nType \"help\" for help.\n\n", version, s.serverVersion(ctx))
+	fmt.Fprintf(s.ui.out, "jevql %s (%s)\nType \"help\" for help.\n\n", version, s.serverVersion(ctx))
 	var buf strings.Builder
 	for {
 		if ctx.Err() != nil {
@@ -94,7 +94,7 @@ func (s *session) repl(ctx context.Context) int {
 func (s *session) prompt(cont bool) string {
 	db := s.dbname
 	if db == "" {
-		db = "jevpsql"
+		db = "jevql"
 	}
 	if cont {
 		return db + "-> "
@@ -111,7 +111,7 @@ func (s *session) serverVersion(ctx context.Context) string {
 }
 
 func (s *session) help() {
-	fmt.Fprint(s.ui.out, `jevpsql: psql-shaped client that evaluates jev() with TypeSafe.
+	fmt.Fprint(s.ui.out, `jevql: psql-shaped client that evaluates jev() with TypeSafe.
 
 SQL functions (evaluated here, never on the server):
   jev(alias, 'condition' [, threshold])           boolean
@@ -242,7 +242,7 @@ func (s *session) meta(ctx context.Context, line string) (bool, error) {
 	case "\\d", "\\dt", "\\dn", "\\l", "\\d+", "\\dt+", "\\dv", "\\ds", "\\di":
 		return false, s.describe(ctx, cmd, args)
 	case "\\c", "\\connect":
-		return false, errors.New("\\c is not implemented; restart jevpsql with a new connection string")
+		return false, errors.New("\\c is not implemented; restart jevql with a new connection string")
 	default:
 		if strings.HasPrefix(cmd, "\\d") {
 			return false, s.describe(ctx, cmd, args)

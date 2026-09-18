@@ -11,7 +11,7 @@ import (
 	pg_query "github.com/pganalyze/pg_query_go/v6"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/parse"
 )
 
 // Column is one attribute of a relation.

@@ -12,7 +12,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/kylemclaren/jevpsql/internal/canon"
+	"github.com/kylemclaren/jevql/internal/canon"
 )
 
 // Format selects the output style.

@@ -1,11 +1,11 @@
-// Command jevpsql is a psql-shaped client that evaluates jev() calls with
+// Command jevql is a psql-shaped client that evaluates jev() calls with
 // TypeSafe while the database only ever sees ordinary SQL.
 package main
 
 import (
 	"os"
 
-	"github.com/kylemclaren/jevpsql/internal/app"
+	"github.com/kylemclaren/jevql/internal/app"
 )
 
 func main() {

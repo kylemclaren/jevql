@@ -5,8 +5,8 @@ import (
 
 	"encoding/json"
 	"fmt"
-	. "github.com/kylemclaren/jevpsql/internal/typesafe"
-	"github.com/kylemclaren/jevpsql/internal/typesafe/typesafetest"
+	. "github.com/kylemclaren/jevql/internal/typesafe"
+	"github.com/kylemclaren/jevql/internal/typesafe/typesafetest"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"

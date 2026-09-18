@@ -1,4 +1,4 @@
-# jevpsql
+# jevQL
 
 A psql-shaped client for **vanilla PostgreSQL** that understands `jev()`.
 
@@ -21,7 +21,7 @@ Requires Go 1.23+ and a C compiler (libpg_query is bundled via
 [`pg_query_go`](https://github.com/pganalyze/pg_query_go) and needs CGO).
 
 ```bash
-CGO_ENABLED=1 go install github.com/kylemclaren/jevpsql/cmd/jevpsql@latest
+CGO_ENABLED=1 go install github.com/kylemclaren/jevql/cmd/jevql@latest
 ```
 
 The first build compiles libpg_query and takes about a minute. On macOS,
@@ -34,16 +34,16 @@ CGO, make sure `CGO_ENABLED=1` is set and that `cc` is on your `PATH`.
 export TYPESAFE_API_KEY=tsk_...
 export DATABASE_URL=postgres://user:pass@localhost:5432/app
 
-jevpsql                                  # REPL
-jevpsql -c "SELECT * FROM people WHERE jev(people, 'could work from home')"
-jevpsql -f query.sql
-jevpsql --explain -c "..."               # plan + cost estimate, no API calls
-jevpsql "postgres://..." -c "SELECT 1"   # plain statements pass straight through
+jevql                                  # REPL
+jevql -c "SELECT * FROM people WHERE jev(people, 'could work from home')"
+jevql -f query.sql
+jevql --explain -c "..."               # plan + cost estimate, no API calls
+jevql "postgres://..." -c "SELECT 1"   # plain statements pass straight through
 ```
 
-Run `jevpsql` with nothing configured and it asks for a database URL and a
+Run `jevql` with nothing configured and it asks for a database URL and a
 TypeSafe API key (hidden input) and offers to save them to
-`~/.config/jevpsql/env` (mode `0600`). That file holds `KEY=VALUE` lines and
+`~/.config/jevql/env` (mode `0600`). That file holds `KEY=VALUE` lines and
 only fills in environment variables that are not already set, so exported
 variables and flags always win. `TYPESAFE_API_URL` can be added there too.
 Inside the REPL, `\set TYPESAFE_API_KEY tsk_...` sets the key for the session.
@@ -125,7 +125,7 @@ count, a rough token estimate and cost. It makes no TypeSafe requests.
 --concurrency      default 6
 --max-rows         default 2500   abort before any HTTP call if collect exceeds this
 --max-chars        default 0      abort if row objects exceed this many chars (0 = off)
---cache            path, default ~/.cache/jevpsql/cache.db
+--cache            path, default ~/.cache/jevql/cache.db
 --no-cache
 --explain          plan + cost estimate, no TypeSafe calls
 --timing           like psql \timing
@@ -163,7 +163,7 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
   data you cannot share with TypeSafe. Use the column-list form or
   `--columns` to send the minimum.
 - The API key comes from `TYPESAFE_API_KEY`, `--api-key`, the interactive
-  prompt, or `~/.config/jevpsql/env`, and is never printed. The saved config
+  prompt, or `~/.config/jevql/env`, and is never printed. The saved config
   file stores the key and the database URL (including its password) in plain
   text with mode `0600`; delete it if that is not acceptable. Point `--api-url` at a proxy if your environment injects
   credentials.
@@ -176,7 +176,7 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
   and dollars a query costs before running it. `--max-rows` (default 2500)
   aborts before any HTTP call.
 - The cache file holds row-content hashes and TypeSafe answers. It is created
-  with mode `0600` in `~/.cache/jevpsql`, but it is not encrypted; delete it
+  with mode `0600` in `~/.cache/jevql`, but it is not encrypted; delete it
   with `\cache clear` if that matters.
 - This is not a wire-compatible psql replacement for GUI tools or
   applications. Cost is estimated at $0.042 per million input tokens; the
@@ -185,16 +185,16 @@ columns included as `null`. There is no expiry in v1; use `\cache clear` or
 ## Development
 
 ```bash
-go build ./cmd/jevpsql
+go build ./cmd/jevql
 go test ./...                      # parse, rewrite (golden), typesafe mock, cache
-PGTEST_URL=postgres://... go test ./internal/exec/   # loads testdata/people.sql into schema jevpsql_test
+PGTEST_URL=postgres://... go test ./internal/exec/   # loads testdata/people.sql into schema jevql_test
 go test ./internal/rewrite/ -update                 # regenerate testdata/golden
 ```
 
 Layout:
 
 ```
-cmd/jevpsql/         main
+cmd/jevql/         main
 internal/app/        flags, connection, REPL, meta commands, spinner
 internal/parse/      pg_query walk, jev call extraction, statement analysis
 internal/rewrite/    collect SQL builder and column layout

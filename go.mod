@@ -1,4 +1,4 @@
-module github.com/kylemclaren/jevpsql
+module github.com/kylemclaren/jevql
 
 go 1.23.0
 

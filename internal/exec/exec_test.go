@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/kylemclaren/jevpsql/internal/cache"
-	"github.com/kylemclaren/jevpsql/internal/parse"
-	"github.com/kylemclaren/jevpsql/internal/typesafe"
-	"github.com/kylemclaren/jevpsql/internal/typesafe/typesafetest"
+	"github.com/kylemclaren/jevql/internal/cache"
+	"github.com/kylemclaren/jevql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/typesafe"
+	"github.com/kylemclaren/jevql/internal/typesafe/typesafetest"
 )
 
 // testDB connects to $PGTEST_URL (skipping otherwise) and loads
@@ -35,7 +35,7 @@ func testDB(t *testing.T) *pgx.Conn {
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
-	schema := "jevpsql_test"
+	schema := "jevql_test"
 	if _, err := conn.Exec(ctx, "DROP SCHEMA IF EXISTS "+schema+" CASCADE; CREATE SCHEMA "+schema+"; SET search_path TO "+schema); err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-// Package app is the jevpsql command: flags, connection, -c / -f / REPL.
+// Package app is the jevql command: flags, connection, -c / -f / REPL.
 package app
 
 import (
@@ -22,11 +22,11 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/term"
 
-	"github.com/kylemclaren/jevpsql/internal/cache"
-	"github.com/kylemclaren/jevpsql/internal/exec"
-	"github.com/kylemclaren/jevpsql/internal/parse"
-	"github.com/kylemclaren/jevpsql/internal/psqlout"
-	"github.com/kylemclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevql/internal/cache"
+	"github.com/kylemclaren/jevql/internal/exec"
+	"github.com/kylemclaren/jevql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/psqlout"
+	"github.com/kylemclaren/jevql/internal/typesafe"
 )
 
 const (
@@ -77,7 +77,7 @@ func envOr(key, def string) string {
 
 func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	c := &Config{}
-	fs := flag.NewFlagSet("jevpsql", flag.ContinueOnError)
+	fs := flag.NewFlagSet("jevql", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.StringVar(&c.Command, "c", "", "run one statement (or several separated by ;) and exit")
 	fs.StringVar(&c.File, "f", "", "run statements from file and exit")
@@ -113,8 +113,8 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.StringVar(&c.Columns, "columns", "", "comma-separated columns to send for alias-form jev(alias, ...)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "jevpsql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
-		fmt.Fprintln(stderr, "Usage:\n  jevpsql [flags] [dbname | postgres://...]\n\nFlags:")
+		fmt.Fprintf(stderr, "jevql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
+		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n\nFlags:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nEnvironment: DATABASE_URL, PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, TYPESAFE_API_KEY, TYPESAFE_API_URL, JEV_THRESHOLD")
 	}
@@ -133,7 +133,7 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 }
 
 // splitArgs lets flags appear after positional arguments, like psql:
-// jevpsql "postgres://..." -c "SELECT 1".
+// jevql "postgres://..." -c "SELECT 1".
 func splitArgs(fs *flag.FlagSet, args []string) (flags, positional []string) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -165,17 +165,17 @@ func splitArgs(fs *flag.FlagSet, args []string) (flags, positional []string) {
 	return flags, positional
 }
 
-// configPath is ~/.config/jevpsql/env: KEY=VALUE lines used as defaults
+// configPath is ~/.config/jevql/env: KEY=VALUE lines used as defaults
 // for environment variables that are not already set.
 func configPath() string {
-	if p := os.Getenv("JEVPSQL_CONFIG"); p != "" {
+	if p := os.Getenv("JEVQL_CONFIG"); p != "" {
 		return p
 	}
 	base, err := os.UserConfigDir()
 	if err != nil || base == "" {
 		base = filepath.Join(os.Getenv("HOME"), ".config")
 	}
-	return filepath.Join(base, "jevpsql", "env")
+	return filepath.Join(base, "jevql", "env")
 }
 
 // loadConfigFile applies saved defaults to the environment.
@@ -218,7 +218,7 @@ func saveConfigFile(kv map[string]string) error {
 		existing[k] = v
 	}
 	var b strings.Builder
-	b.WriteString("# jevpsql defaults; environment variables override these.\n")
+	b.WriteString("# jevql defaults; environment variables override these.\n")
 	for k, v := range existing {
 		fmt.Fprintf(&b, "%s=%s\n", k, v)
 	}
@@ -239,7 +239,7 @@ func Main(args []string, stdin *os.File, stdout, stderr *os.File) int {
 		return ExitSQL
 	}
 	if cfg.ShowVersion {
-		fmt.Fprintf(stdout, "jevpsql %s\n", version)
+		fmt.Fprintf(stdout, "jevql %s\n", version)
 		return ExitOK
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -330,7 +330,7 @@ func newSession(ctx context.Context, cfg *Config, u *ui, stdin *os.File) (*sessi
 		return nil, err
 	}
 	connCfg.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-	connCfg.RuntimeParams["application_name"] = "jevpsql"
+	connCfg.RuntimeParams["application_name"] = "jevql"
 	connCfg.OnNotice = func(_ *pgconn.PgConn, n *pgconn.Notice) {
 		fmt.Fprintf(u.err, "%s:  %s\n", n.Severity, n.Message)
 	}

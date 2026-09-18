@@ -1,4 +1,4 @@
--- Sample data for jevpsql tests and demos.
+-- Sample data for jevql tests and demos.
 DROP TABLE IF EXISTS people;
 DROP TABLE IF EXISTS cities;
 DROP TABLE IF EXISTS tickets;

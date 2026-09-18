@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kylemclaren/jevpsql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/parse"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")

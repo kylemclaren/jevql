@@ -22,16 +22,16 @@ type Store struct {
 	Path string
 }
 
-// DefaultPath is ~/.cache/jevpsql/cache.db.
+// DefaultPath is ~/.cache/jevql/cache.db.
 func DefaultPath() string {
-	if p := os.Getenv("JEVPSQL_CACHE"); p != "" {
+	if p := os.Getenv("JEVQL_CACHE"); p != "" {
 		return p
 	}
 	base, err := os.UserCacheDir()
 	if err != nil || base == "" {
 		base = filepath.Join(os.Getenv("HOME"), ".cache")
 	}
-	return filepath.Join(base, "jevpsql", "cache.db")
+	return filepath.Join(base, "jevql", "cache.db")
 }
 
 // Open creates the file (mode 0600) and schema if needed.

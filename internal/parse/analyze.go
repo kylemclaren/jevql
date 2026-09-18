@@ -567,7 +567,7 @@ func checkSubLinks(n proto.Message) error {
 			return false
 		}
 		if sl, ok := m.(*pg_query.SubLink); ok && ContainsJev(sl) {
-			err = errors.New("jev_* inside a subquery is not supported in v1; run the inner query with jevpsql instead")
+			err = errors.New("jev_* inside a subquery is not supported in v1; run the inner query with jevql instead")
 			return false
 		}
 		return true

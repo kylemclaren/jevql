@@ -15,13 +15,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/kylemclaren/jevpsql/internal/cache"
-	"github.com/kylemclaren/jevpsql/internal/canon"
-	"github.com/kylemclaren/jevpsql/internal/parse"
-	"github.com/kylemclaren/jevpsql/internal/psqlout"
-	"github.com/kylemclaren/jevpsql/internal/rewrite"
-	"github.com/kylemclaren/jevpsql/internal/stats"
-	"github.com/kylemclaren/jevpsql/internal/typesafe"
+	"github.com/kylemclaren/jevql/internal/cache"
+	"github.com/kylemclaren/jevql/internal/canon"
+	"github.com/kylemclaren/jevql/internal/parse"
+	"github.com/kylemclaren/jevql/internal/psqlout"
+	"github.com/kylemclaren/jevql/internal/rewrite"
+	"github.com/kylemclaren/jevql/internal/stats"
+	"github.com/kylemclaren/jevql/internal/typesafe"
 )
 
 // Options tune a jev execution.
@@ -736,7 +736,7 @@ func (x *Explain) Render() string {
 	if x.ServerOrder {
 		b.WriteString("ORDER BY / LIMIT:       pushed to Postgres\n")
 	} else {
-		b.WriteString("ORDER BY / LIMIT:       applied in jevpsql after judging\n")
+		b.WriteString("ORDER BY / LIMIT:       applied in jevql after judging\n")
 	}
 	b.WriteString("(no TypeSafe requests were made; cache hits are not counted here)\n")
 	return b.String()
