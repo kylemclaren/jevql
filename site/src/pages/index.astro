@@ -153,7 +153,6 @@ const install = "brew install kylemclaren/tap/jevql"
     <section class="machine" aria-labelledby="install-title">
       <div class="section-head">
         <div><p class="eyebrow">install</p><h2 id="install-title">Install it, then type <code>jevql</code></h2></div>
-        <a class="repo-link" href={`${repo}/releases`} target="_blank" rel="noopener">releases ↗</a>
       </div>
       <div class="install-cta install-actions">
         <button id="download" class="secondary" type="button">
@@ -163,13 +162,13 @@ const install = "brew install kylemclaren/tap/jevql"
           <span class="material-symbols-rounded" aria-hidden="true">content_copy</span> {install}
         </button>
       </div>
-      <div class="phases" aria-label="Install options">
-        <div class="phase"><small>shell</small><pre class="output" id="curl-line-2">curl -fsSL …/install.sh | sh</pre></div>
-        <div class="phase"><small>binaries</small><pre class="output">macOS arm64 · x86_64
-Linux amd64 · arm64</pre><span><a href={`${repo}/releases`} target="_blank" rel="noopener">github releases ↗</a></span></div>
-        <div class="phase"><small>go</small><pre class="output">go install github.com/kylemclaren/jevql/cmd/jevql@latest</pre><span>needs CGO for the Postgres parser</span></div>
-      </div>
-      <p class="fine">First launch asks for a database URL and a TypeSafe key and saves them to <code>~/.config/jevql/env</code>. Or use <code>DATABASE_URL</code>, <code>PG*</code> and <code>TYPESAFE_API_KEY</code> like any psql user.</p>
+      <p class="install-alt">
+        <span>or</span>
+        <button class="copy chip" type="button" data-copy="curl -fsSL https://jevql.fly.dev/install.sh | sh"><span class="material-symbols-rounded" aria-hidden="true">content_copy</span> curl -fsSL jevql.fly.dev/install.sh | sh</button>
+        <button class="copy chip" type="button" data-copy="CGO_ENABLED=1 go install github.com/kylemclaren/jevql/cmd/jevql@latest"><span class="material-symbols-rounded" aria-hidden="true">content_copy</span> go install</button>
+        <a class="chip" href={`${repo}/releases`} target="_blank" rel="noopener">release tarballs ↗</a>
+      </p>
+      <p class="fine">First launch asks for a database URL and a TypeSafe key and saves them to <code>~/.config/jevql/env</code>. Or set <code>DATABASE_URL</code> and <code>TYPESAFE_API_KEY</code> like any psql user.</p>
     </section>
 
     <section class="method-map" aria-label="How a query runs">
@@ -522,7 +521,6 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
     .mast .tagline { display: none; }
     .mast .repo-link { padding: 6px 8px; font-size: .6rem; }
     .install-cta { display: flex; margin-top: 18px; }
-    .install-cta > #download, .install-cta > .secondary { display: none; }
     .install-cta .prompt-pill { width: 100%; justify-content: flex-start; padding: 8px 12px 8px 8px; font-size: .8rem; }
     .truth-strip { margin-top: 8px; }
     .copy-btn { display: none; }
@@ -577,8 +575,13 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
   .phase .copy-wrap { margin-top: 8px; }
   .phase .copy-wrap > pre { margin: 0; }
 
-  .install-actions { margin: 0 0 16px; }
+  .install-actions { margin: 0 0 14px; }
   .install-actions button { padding: 14px 18px; font-size: .8rem; }
+  .install-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; font-size: .68rem; font-weight: 900; text-transform: uppercase; color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--ink); background: #fff; box-shadow: none; color: var(--ink); text-decoration: none; font: 700 .66rem/1 ui-monospace, monospace; text-transform: none; cursor: pointer; }
+  .chip:hover { background: var(--lime); }
+  .chip .material-symbols-rounded { font-size: .9rem; }
+  .install-alt .chip:active { transform: none; box-shadow: none; }
   /* "hand it to your agent" pill: a stack of tool marks that jiggle on hover */
   .install-cta .prompt-pill { display: inline-flex; align-items: center; gap: 14px; padding: 9px 22px 9px 9px; background: #fff; text-transform: none; text-align: left; box-shadow: 4px 4px 0 var(--ink); }
   .install-cta .prompt-pill:hover, .install-cta .prompt-pill.done { background: var(--lime); }
