@@ -1,6 +1,6 @@
 # jevQL
 
-A psql-shaped client for **vanilla PostgreSQL** that understands `jev()`.
+Semantic SQL for **vanilla PostgreSQL**. One extra family of functions, `jev()`, works in any query, from the CLI, from a shared HTTP and MCP node, or from the Go, TypeScript and Python SDKs.
 
 ```sql
 SELECT name, city, jev_prob(people, 'could work from home') AS p

@@ -111,7 +111,7 @@ func (s *session) serverVersion(ctx context.Context) string {
 }
 
 func (s *session) help() {
-	fmt.Fprint(s.ui.out, `jevql: psql-shaped client that evaluates jev() with TypeSafe.
+	fmt.Fprint(s.ui.out, `jevql: semantic SQL for vanilla Postgres. jev() is evaluated here with TypeSafe.
 
 SQL functions (evaluated here, never on the server):
   jev(alias, 'condition' [, threshold])           boolean

@@ -1,6 +1,6 @@
 # jevql
 
-> A psql-shaped CLI, SDKs and MCP server that add semantic functions to any vanilla PostgreSQL.
+> Semantic SQL for vanilla PostgreSQL: a CLI, an HTTP and MCP node, and Go, TypeScript and Python SDKs that add jev() functions to any query.
 > Write `WHERE jev(alias, 'plain-English condition')`. Postgres runs the ordinary SQL; jevql judges
 > the surviving rows with TypeSafe's Jev model, caches every answer, and applies filter/sort/group.
 > No extension, no proxy, nothing installed on the database server.

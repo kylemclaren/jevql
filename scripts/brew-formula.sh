@@ -26,7 +26,7 @@ url() { printf '%s/releases/download/v%s/jevql_%s_%s_%s.tar.gz' "$repo" "$versio
 
 cat <<RUBY
 class Jevql < Formula
-  desc "psql-shaped client that evaluates jev() with TypeSafe against vanilla Postgres"
+  desc "Semantic SQL for vanilla Postgres: jev() in any query, judged by TypeSafe"
   homepage "${repo}"
   version "${version}"
   license "MIT"

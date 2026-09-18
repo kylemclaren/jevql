@@ -8,7 +8,7 @@ const docs = await getCollection("docs", (e) => !e.data.draft)
 const pages: Record<string, { title: string; description: string }> = {
   index: {
     title: "Ask your database a real question.",
-    description: "WHERE jev(people, 'could work from home')\n\nA psql-shaped CLI for vanilla Postgres. No extension.",
+    description: "WHERE jev(people, 'could work from home')\n\nSemantic SQL for vanilla Postgres. CLI, SDKs, MCP. No extension.",
   },
 }
 for (const e of docs) {

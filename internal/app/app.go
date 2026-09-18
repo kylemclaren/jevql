@@ -153,7 +153,7 @@ func parseFlags(args []string, stderr io.Writer) (*Config, error) {
 	fs.BoolVar(&c.CacheAdmin, "allow-cache-admin", os.Getenv("JEVQL_ALLOW_CACHE_ADMIN") != "", "serve: enable GET/DELETE /v1/cache (default $JEVQL_ALLOW_CACHE_ADMIN)")
 	fs.BoolVar(&c.ShowVersion, "version", false, "print version and exit")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "jevql %s - psql-shaped client that evaluates jev() with TypeSafe\n\n", version)
+		fmt.Fprintf(stderr, "jevql %s - semantic SQL for vanilla Postgres: a CLI, an HTTP/MCP node (serve, mcp), and the engine behind the SDKs\n\n", version)
 		fmt.Fprintln(stderr, "Usage:\n  jevql [flags] [dbname | postgres://...]\n  jevql serve [--listen 127.0.0.1:7433] [--token SECRET] [dbname | postgres://...]\n  jevql mcp [--allow-writes] [dbname | postgres://...]   (MCP server on stdio)\n\nFlags:")
 		fs.PrintDefaults()
 		fmt.Fprintln(stderr, "\nEnvironment: DATABASE_URL, PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE, TYPESAFE_API_KEY, TYPESAFE_API_URL, JEV_THRESHOLD")
