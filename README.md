@@ -62,6 +62,79 @@ Statements without `jev_*` are sent to Postgres unchanged. Any psql
 connection style works: a URI, `-h/-p/-U/-d`, `PG*` environment variables, or
 `DATABASE_URL`.
 
+## Things to try
+
+Any table with a text column is fair game. A few that are more fun than "could work from home":
+
+```sql
+-- Meetings that could have been an email
+SELECT title, organizer
+FROM meetings
+WHERE jev(meetings, 'could have been an email')
+  AND starts_at > now();
+
+-- Commit messages that are really apologies
+SELECT left(sha, 7), message
+FROM commits
+WHERE jev(commits, 'is apologising for something')
+ORDER BY committed_at DESC
+LIMIT 20;
+
+-- What is the reviewer actually upset about?
+SELECT jev_choice(reviews, 'what is the reviewer really upset about?',
+                  ARRAY['food', 'service', 'price', 'parking', 'other people']) AS gripe,
+       count(*)
+FROM reviews
+WHERE stars <= 2
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- Rank the wine list by how insufferable the tasting note is
+SELECT name, price,
+       jev_score(wines, 'how pretentious is the tasting note?',
+                 ARRAY['plain', 'flowery', 'insufferable']) AS pretension
+FROM wines
+ORDER BY pretension DESC
+LIMIT 5;
+
+-- Job posts that are sales roles in disguise
+SELECT title, company
+FROM jobs
+WHERE jev(jobs, 'is really a sales job despite the title')
+  AND posted_at > now() - interval '7 days';
+
+-- Support tickets where the customer already turned it off and on again
+SELECT id, subject
+FROM tickets
+WHERE jev(tickets, 'the customer says they already restarted it')
+  AND status = 'open';
+
+-- Weeknight-feasible vegetarian dinners, best guesses first
+SELECT name, jev_prob(recipes, 'can be cooked on a weeknight in under 40 minutes') AS p
+FROM recipes
+WHERE jev((name, ingredients), 'is vegetarian')
+ORDER BY p DESC
+LIMIT 10;
+
+-- Pull requests by reviewer mood
+SELECT jev_choice(prs, 'what is the overall tone of the review comments?',
+                  ARRAY['nitpicky', 'blocking', 'rubber stamp', 'genuinely helpful']) AS mood,
+       count(*)
+FROM prs
+WHERE merged_at IS NULL
+GROUP BY 1;
+
+-- Slack messages that are passive-aggressive, by author
+SELECT author, count(*) AS incidents
+FROM messages
+WHERE jev((author, text), 'is passive-aggressive')
+  AND sent_at > now() - interval '30 days'
+GROUP BY author
+ORDER BY incidents DESC;
+```
+
+Every one of these judges only the rows the SQL lets through, so the date and status filters matter for the bill. `--explain` shows the count before you pay.
+
 ### SQL surface
 
 The first argument is a **FROM alias** (`people`, or `p` in `FROM people p`).
