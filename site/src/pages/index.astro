@@ -427,10 +427,12 @@ jev: 240 judged, 6 req, 120 cache hits, 17.8k tokens, $0.0007, 2.2s`,
 
 <style is:global>
   code { font: inherit; font-family: ui-monospace, monospace; font-weight: 800; }
-  .hero-snippet { display: inline; border: 1px solid var(--line); border-radius: 2px; background: #fff; padding: 3px 8px 4px; margin: 0 2px; font: 700 .82em/1 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; vertical-align: 1px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  /* inline predicate in the lede: a quiet tinted chip that wraps with the sentence */
+  .hero-snippet { display: inline; background: #ecebe4; border-radius: 3px; padding: .15em .45em .2em; margin: 0 .05em; font: 700 .84em/1.15 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.01em; white-space: normal; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .hero-snippet .kw { color: var(--pink); }
-  .hero-snippet .fn { background: var(--lime); padding: 1px 3px; }
-  .hero-snippet .str, .hero-snippet .pn { color: var(--muted); }
+  .hero-snippet .fn { background: linear-gradient(transparent 55%, var(--lime) 55%); padding: 0 .1em; }
+  .hero-snippet .str { color: var(--muted); }
+  .hero-snippet .pn { color: var(--ink); opacity: .55; }
   .lede { line-height: 1.7; }
   .lede code { font-size: .9em; }
   .install-cta { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 26px; }
