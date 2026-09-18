@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import { highlightSQL } from "./highlight"
 
 /* ─────────────────────────────────────────────────────────
@@ -164,8 +165,8 @@ export default function Playground() {
             <textarea ref={ta} value={sql} onChange={(e) => setSql(e.target.value)} onKeyDown={onKey} onScroll={syncScroll} spellCheck={false} aria-label="SQL" rows={9} />
           </div>
           <div className="pg-actions">
-            <button type="button" onClick={() => run("run")} disabled={!!busy}>{busy === "run" ? "judging…" : "run"} <kbd>⌘↵</kbd></button>
-            <button type="button" className="secondary" onClick={() => run("explain")} disabled={!!busy}>{busy === "explain" ? "planning…" : "explain"} <kbd>⇧⌘↵</kbd></button>
+            <button type="button" onClick={() => run("run")} disabled={!!busy}>{busy === "run" ? "judging…" : "run"} <KbdGroup><Kbd>⌘</Kbd><Kbd>↵</Kbd></KbdGroup></button>
+            <button type="button" className="secondary" onClick={() => run("explain")} disabled={!!busy}>{busy === "explain" ? "planning…" : "explain"} <KbdGroup><Kbd>⇧</Kbd><Kbd>⌘</Kbd><Kbd>↵</Kbd></KbdGroup></button>
             <span className="pg-hint">Read-only demo data. Every row that survives the SQL filters is judged; this node caps a query at 300 rows.</span>
           </div>
         </div>

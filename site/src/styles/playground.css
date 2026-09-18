@@ -53,7 +53,9 @@
 .pg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding: 10px 12px; }
 .pg-actions button { padding: 10px 14px; }
 .pg-actions button.secondary { background: #fff; }
-.pg-actions kbd { margin-left: 6px; font: 700 .58rem ui-monospace, monospace; opacity: .6; text-transform: none; }
+.pg-actions [data-slot="kbd-group"] { margin-left: 8px; gap: 3px; }
+.pg-actions [data-slot="kbd"] { height: 18px; min-width: 18px; padding: 0 4px; border: 1px solid var(--ink); border-bottom-width: 2px; border-radius: 3px; background: #fff; color: var(--ink); font: 700 .6rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: none; }
+.pg-actions button:disabled [data-slot="kbd"] { opacity: .5; }
 .pg-hint { margin-left: auto; font-size: .62rem; color: var(--muted); font-weight: 700; }
 .pg-error { margin: 0; border-left: 5px solid var(--red); background: #ecebe4; padding: 10px 12px; font: 700 .78rem/1.5 ui-monospace, monospace; white-space: pre-wrap; }
 .pg-explain { border: 1.5px solid var(--ink); background: var(--panel); padding: 14px; }
