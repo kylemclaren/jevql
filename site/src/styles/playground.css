@@ -37,7 +37,15 @@
 .pg-cols span { color: var(--muted); }
 .pg-examples button { font-weight: 600; }
 .pg-examples button { display: grid; grid-template-columns: 14px 1fr; gap: 4px; align-items: start; }
-.pg-examples button::before { content: "→"; color: var(--pink); }
+.pg-examples button::before { content: ""; width: 10px; height: 10px; margin-top: 3px; border: 1px solid var(--ink); background: var(--lvl, #fff); }
+.pg-examples button[data-level="1"] { --lvl: #e6e5dc; }
+.pg-examples button[data-level="2"] { --lvl: #d4ff3f; }
+.pg-examples button[data-level="3"] { --lvl: #b9e33c; }
+.pg-examples button[data-level="4"] { --lvl: #f4b84a; }
+.pg-examples button[data-level="5"] { --lvl: #ee5ba6; }
+.pg-examples button[data-level="6"] { --lvl: #171715; }
+.pg-scale { display: flex; align-items: center; gap: 6px; margin: -4px 0 6px; font-size: .56rem; font-weight: 900; text-transform: uppercase; color: var(--muted); }
+.pg-scale i { flex: 1; height: 6px; border: 1px solid var(--ink); background: linear-gradient(to right, #e6e5dc, #d4ff3f 25%, #b9e33c 45%, #f4b84a 62%, #ee5ba6 82%, #171715); }
 .pg-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .pg-editor { border: 1.5px solid var(--ink); background: var(--panel); box-shadow: 4px 4px 0 var(--ink); }
 .pg-code { position: relative; }

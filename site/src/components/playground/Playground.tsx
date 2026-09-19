@@ -16,72 +16,69 @@ type Result = { columns: string[]; rows: unknown[][]; row_count: number; tag: st
 type Table = { schema: string; name: string; kind: string }
 type TableDetail = { name: string; columns: { name: string; type: string }[] }
 
-const EXAMPLES: { label: string; sql: string }[] = [
-  { label: "what do shoppers ask about a LifeStraw bottle?", sql: `-- 1.6M real Amazon shopper questions (Amazon-PQA). One listing at a time keeps it under the 300-row cap.
-SELECT jev_choice((q.text, l.title), 'What is this shopper asking about?',
-                  ARRAY['filtering and safety', 'capacity or size', 'durability',
-                        'cleaning and maintenance', 'price or shipping', 'something else']) AS topic,
-       count(*)
-FROM questions q JOIN listings l ON l.asin = q.asin
-WHERE q.asin = 'B00H90PFOK'
+// Ordered from plain SQL to multi-table judgements. level drives the swatch colour in the sidebar.
+const LEVELS = ["plain SQL", "one jev() filter", "rank and scale", "classify and group", "several tables", "explain the bill"]
+const EXAMPLES: { label: string; level: number; sql: string }[] = [
+  { label: "what is in here?", level: 1, sql: `-- plain SQL passes straight through to Postgres. 365k Amazon listings, 1.6M shopper questions, 3.5M answers (Amazon-PQA).
+SELECT category, count(*) AS listings
+FROM listings
 GROUP BY 1
 ORDER BY 2 DESC;` },
-  { label: "grade the model against real yes/no verdicts", sql: `-- verdict is the dataset's own label. How often does the model read the answer the same way?
-SELECT q.verdict AS label,
-       jev_choice((q.text, a.text), 'Does this answer say yes or no to the question?',
-                  ARRAY['yes', 'no', 'neutral']) AS judged,
-       count(*)
-FROM answers a JOIN questions q ON q.id = a.question_id
-WHERE q.asin = 'B07P7VVCDD' AND q.kind = 'yes-no'
-GROUP BY 1, 2
-ORDER BY 1, 3 DESC;` },
-  { label: "questions the listing already answers", sql: `-- two tables in one judgement: the bullet points from listings, the question from questions
-SELECT left(q.text, 70) AS question,
-       jev_prob((l.bullets, q.text), 'the bullet points already answer this question') AS covered
+  { label: "the most-asked-about backpack brands", level: 1, sql: `-- pick a brand from here, then use it in the WHERE of any example below
+SELECT l.brand, count(*) AS questions
 FROM questions q JOIN listings l ON l.asin = q.asin
-WHERE q.asin = 'B0018OR118'
-ORDER BY covered DESC
-LIMIT 12;` },
-  { label: "is this drone safe for a kid?", sql: `-- a jev() predicate across every Sky Viper listing
+WHERE l.category = 'backpacks' AND l.brand IS NOT NULL
+GROUP BY 1
+ORDER BY 2 DESC
+LIMIT 15;` },
+  { label: "is this drone safe for a kid?", level: 2, sql: `-- one jev() predicate. Postgres runs the brand filter; Jev judges the 295 rows that survive it.
 SELECT left(l.title, 40) AS drone, q.text
 FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE l.brand = 'Sky Viper'
   AND jev((l.title, q.text), 'asks whether it is suitable or safe for a child')
 LIMIT 15;` },
-  { label: "pest strip: who is asking about pets and kids?", sql: `-- rank by probability; the dataset's yes/no verdict rides along for comparison
-SELECT left(q.text, 70) AS question, q.verdict,
-       jev_prob(q, 'asks whether it is safe around pets or children') AS p
-FROM questions q
-WHERE q.asin = 'B0019BK8AG' AND q.kind = 'yes-no'
-ORDER BY p DESC
-LIMIT 10;` },
-  { label: "how frustrated are Sims 3 buyers?", sql: `-- jev_score maps an ordered scale to a number you can sort by
-SELECT left(q.text, 70) AS question,
-       jev_score((q.text, l.title), 'How frustrated does the asker sound?',
-                 ARRAY['neutral', 'mildly annoyed', 'frustrated', 'furious']) AS mood
-FROM questions q JOIN listings l ON l.asin = q.asin
-WHERE q.asin = 'B00C0K4YHI'
-ORDER BY mood DESC
-LIMIT 10;` },
-  { label: "answers that contradict the listing", sql: `-- three tables: the answer, its question, and the bullet points it argues with
-SELECT left(q.text, 45) AS question, left(a.text, 60) AS answer
-FROM answers a
-JOIN questions q ON q.id = a.question_id
-JOIN listings l ON l.asin = q.asin
-WHERE q.asin = 'B0018OR118' AND q.kind = 'yes-no'
-  AND jev((l.bullets, q.text, a.text), 'the answer contradicts what the bullet points say')
-LIMIT 10;` },
-  { label: "answers that admit they don't know", sql: `SELECT left(q.text, 50) AS question, left(a.text, 60) AS answer
-FROM answers a JOIN questions q ON q.id = a.question_id
-WHERE q.asin = 'B07P7VVCDD'
-  AND jev((q.text, a.text), 'the person answering admits they do not know')
-LIMIT 10;` },
-  { label: "Versace sunglasses: questions not in English", sql: `SELECT left(l.title, 30) AS listing, q.text
+  { label: "Versace sunglasses: questions not in English", level: 2, sql: `SELECT left(l.title, 30) AS listing, q.text
 FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE l.brand = 'Versace'
   AND jev(q, 'is not written in English')
 LIMIT 15;` },
-  { label: "what are these rugs made of?", sql: `-- judge the listings themselves, not the questions
+  { label: "Polk speakers: battery and charging questions", level: 2, sql: `SELECT left(l.title, 40) AS speaker, q.text
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Polk Audio'
+  AND jev(q, 'asks about battery life or charging')
+LIMIT 15;` },
+  { label: "pest strip: who is asking about pets and kids?", level: 3, sql: `-- jev_prob ranks instead of filtering; the dataset's own yes/no verdict rides along
+SELECT left(q.text, 70) AS question, q.verdict,
+       jev_prob(q, 'asks whether it is safe around pets or children') AS p
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.title ILIKE '%No-Pest Strip%' AND q.kind = 'yes-no'
+ORDER BY p DESC
+LIMIT 10;` },
+  { label: "how frustrated are Sims 3 buyers?", level: 3, sql: `-- jev_score maps an ordered scale to a number you can sort by
+SELECT left(q.text, 70) AS question,
+       jev_score((q.text, l.title), 'How frustrated does the asker sound?',
+                 ARRAY['neutral', 'mildly annoyed', 'frustrated', 'furious']) AS mood
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.title ILIKE '%Sims 3 Starter%' AND q.kind = 'open-ended'
+ORDER BY mood DESC
+LIMIT 10;` },
+  { label: "where is the model unsure?", level: 3, sql: `-- jev_confidence: the judgements to double-check by hand, least sure first
+SELECT left(q.text, 70) AS question,
+       jev_confidence(q, 'asks about battery life or run time') AS confidence
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Streamlight' AND l.title ILIKE '%TLR-7%'
+ORDER BY confidence
+LIMIT 10;` },
+  { label: "what do LifeStraw shoppers ask about?", level: 4, sql: `-- jev_choice picks one option per row, and the column groups like any other
+SELECT jev_choice((q.text, l.title), 'What is this shopper asking about?',
+                  ARRAY['filtering and safety', 'capacity or size', 'durability',
+                        'cleaning and maintenance', 'price or shipping', 'something else']) AS topic,
+       count(*)
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'LifeStraw' AND q.kind = 'open-ended'
+GROUP BY 1
+ORDER BY 2 DESC;` },
+  { label: "what are these rugs made of?", level: 4, sql: `-- judge the listings themselves, not the questions
 SELECT jev_choice((title, bullets), 'What is the rug made of?',
                   ARRAY['polypropylene or synthetic', 'wool', 'cotton', 'jute or natural fibre', 'not stated']) AS material,
        count(*)
@@ -89,35 +86,50 @@ FROM listings
 WHERE category = 'area rugs' AND brand = 'Sweet Home Stores'
 GROUP BY 1
 ORDER BY 2 DESC;` },
-  { label: "where is the model unsure?", sql: `-- jev_confidence: the judgements to double-check by hand
-SELECT left(q.text, 70) AS question,
-       jev_confidence(q, 'asks about battery life or run time') AS confidence
-FROM questions q
-WHERE q.asin = 'B079C6JV13'
-ORDER BY confidence
-LIMIT 10;` },
-  { label: "urgent tickets that sound angry", sql: `-- the small demo store: tickets, reviews, staff
-SELECT id, subject, priority
-FROM tickets
-WHERE status = 'open' AND priority IN ('high', 'urgent')
-  AND jev((subject, body), 'the customer sounds angry or is threatening to leave')
-ORDER BY created_at DESC
-LIMIT 15;` },
-  { label: "route open tickets to teams", sql: `SELECT jev_choice((subject, body), 'which team should handle this?',
-                  ARRAY['billing', 'technical', 'shipping', 'sales', 'other']) AS team,
+  { label: "grade the model against real yes/no verdicts", level: 4, sql: `-- verdict is the dataset's own label. How often does the model read the answer the same way?
+SELECT q.verdict AS label,
+       jev_choice((q.text, a.text), 'Does this answer say yes or no to the question?',
+                  ARRAY['yes', 'no', 'neutral']) AS judged,
        count(*)
-FROM tickets
-WHERE status = 'open' AND created_at > now() - interval '30 days'
-GROUP BY 1
-ORDER BY 2 DESC;` },
-  { label: "explain before you spend", sql: `-- press Explain (not Run): rows after filters, batches, tokens, cost. No TypeSafe call.
+FROM answers a
+JOIN questions q ON q.id = a.question_id
+JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Bose' AND l.category = 'sunglasses' AND q.kind = 'yes-no'
+GROUP BY 1, 2
+ORDER BY 1, 3 DESC;` },
+  { label: "questions the listing already answers", level: 5, sql: `-- two tables in one judgement: the bullet points from listings, the question from questions
+SELECT left(q.text, 70) AS question,
+       jev_prob((l.bullets, q.text), 'the bullet points already answer this question') AS covered
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.title = 'Levi''s Men''s 501 Original-Fit Jean'
+ORDER BY covered DESC
+LIMIT 12;` },
+  { label: "answers that contradict the listing", level: 5, sql: `-- three tables: the answer, its question, and the bullet points it argues with
+SELECT left(q.text, 45) AS question, left(a.text, 60) AS answer
+FROM answers a
+JOIN questions q ON q.id = a.question_id
+JOIN listings l ON l.asin = q.asin
+WHERE l.title = 'Levi''s Men''s 501 Original-Fit Jean' AND q.kind = 'yes-no'
+  AND jev((l.bullets, q.text, a.text), 'the answer contradicts what the bullet points say')
+LIMIT 10;` },
+  { label: "answers that admit they don't know", level: 5, sql: `SELECT left(q.text, 50) AS question, left(a.text, 60) AS answer
+FROM answers a
+JOIN questions q ON q.id = a.question_id
+JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Bose' AND l.category = 'sunglasses' AND q.kind = 'yes-no'
+  AND jev((q.text, a.text), 'the person answering admits they do not know')
+LIMIT 10;` },
+  { label: "explain before you spend", level: 6, sql: `-- press Explain (not Run): rows after filters, batches, tokens, cost. No TypeSafe call.
 -- This would judge every question about every Bluetooth speaker: 189,068 rows, about $0.70.
--- Run refuses it on this node (300-row cap). Add a listing or a brand filter and it fits.
+-- Run refuses it on this node (300-row cap). Add a brand filter and it fits.
 SELECT q.text
 FROM questions q
 WHERE q.category = 'portable bluetooth speakers'
   AND jev(q, 'asks whether it is waterproof');` },
 ]
+
+// The demo node also carries a small synthetic store; the playground features the Amazon data only.
+const HIDDEN_ON_DEMO = new Set(["customers", "employees", "order_items", "orders", "products", "reviews", "tickets"])
 
 const DEFAULT_NODE = "https://jevql-node.fly.dev"
 // The demo node is open: read-only data, a 300-row cap per query and a rate limit.
@@ -205,7 +217,7 @@ export default function Playground() {
         <section>
           <p className="eyebrow">tables</p>
           <ul className="pg-tables">
-            {tables.map((t) => (
+            {tables.filter((t) => node !== DEFAULT_NODE || !HIDDEN_ON_DEMO.has(t.name)).map((t) => (
               <li key={t.schema + t.name}><button type="button" onClick={() => describe(t.name)} className={detail?.name.endsWith(t.name) ? "on" : ""}>{t.name}<small>{t.kind}</small></button></li>
             ))}
             {tables.length === 0 && <li className="muted">{connected ? "no tables" : "connect a node to list tables"}</li>}
@@ -218,8 +230,9 @@ export default function Playground() {
         </section>
         <section>
           <p className="eyebrow">examples</p>
+          <p className="pg-scale" aria-hidden="true"><span>simple</span><i /><span>complex</span></p>
           <ul className="pg-examples">
-            {EXAMPLES.map((ex) => <li key={ex.label}><button type="button" onClick={() => { setSql(ex.sql); ta.current?.focus() }}>{ex.label}</button></li>)}
+            {EXAMPLES.map((ex) => <li key={ex.label}><button type="button" data-level={ex.level} title={LEVELS[ex.level - 1]} onClick={() => { setSql(ex.sql); ta.current?.focus() }}>{ex.label}</button></li>)}
           </ul>
         </section>
       </aside>
