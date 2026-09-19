@@ -429,7 +429,7 @@ func isLoopback(addr string) bool {
 type session struct {
 	cfg         *Config
 	ui          *ui
-	conn        *pgx.Conn
+	conn        *pgdb
 	cache       *cache.Store
 	ex          *exec.Executor
 	timing      bool
@@ -458,7 +458,7 @@ func newSession(ctx context.Context, cfg *Config, u *ui, stdin *os.File) (*sessi
 		}
 		connCfg.Password = pw
 	}
-	conn, err := pgx.ConnectConfig(ctx, connCfg)
+	conn, err := newPGDB(ctx, connCfg, u.warnf)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "28P01" && !cfg.NoPassword && !cfg.ForcePass && isTerminal(stdin) {
@@ -467,7 +467,7 @@ func newSession(ctx context.Context, cfg *Config, u *ui, stdin *os.File) (*sessi
 				return nil, perr
 			}
 			connCfg.Password = pw
-			conn, err = pgx.ConnectConfig(ctx, connCfg)
+			conn, err = newPGDB(ctx, connCfg, u.warnf)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("connection to server failed: %v", err)
