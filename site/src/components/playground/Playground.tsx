@@ -62,12 +62,13 @@ FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE l.title ILIKE '%Sims 3 Starter%' AND q.kind = 'open-ended'
 ORDER BY mood DESC
 LIMIT 10;` },
-  { label: "where is the model unsure?", level: 3, sql: `-- jev_confidence: the judgements to double-check by hand, least sure first
+  { label: "which fit questions is the model surest about?", level: 3, sql: `-- jev_confidence next to a jev() filter on the same question: each row is judged once, then sorted by how sure the model was
 SELECT left(q.text, 70) AS question,
-       jev_confidence(q, 'asks about battery life or run time') AS confidence
+       jev_confidence(q, 'asks whether it fits a particular gun or holster') AS confidence
 FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE l.brand = 'Streamlight' AND l.title ILIKE '%TLR-7%'
-ORDER BY confidence
+  AND jev(q, 'asks whether it fits a particular gun or holster')
+ORDER BY confidence DESC
 LIMIT 10;` },
   { label: "what do LifeStraw shoppers ask about?", level: 4, sql: `-- jev_choice picks one option per row, and the column groups like any other
 SELECT jev_choice((q.text, l.title), 'What is this shopper asking about?',
@@ -86,7 +87,7 @@ FROM listings
 WHERE category = 'area rugs' AND brand = 'Sweet Home Stores'
 GROUP BY 1
 ORDER BY 2 DESC;` },
-  { label: "grade the model against real yes/no verdicts", level: 4, sql: `-- verdict is the dataset's own label. How often does the model read the answer the same way?
+  { label: "grade the model against real yes/no verdicts", level: 4, sql: `-- verdict is the dataset's label for what the answers say overall. How often does the model read each answer the same way?
 SELECT q.verdict AS label,
        jev_choice((q.text, a.text), 'Does this answer say yes or no to the question?',
                   ARRAY['yes', 'no', 'neutral']) AS judged,
@@ -97,20 +98,20 @@ JOIN listings l ON l.asin = q.asin
 WHERE l.brand = 'Bose' AND l.category = 'sunglasses' AND q.kind = 'yes-no'
 GROUP BY 1, 2
 ORDER BY 1, 3 DESC;` },
-  { label: "questions the listing already answers", level: 5, sql: `-- two tables in one judgement: the bullet points from listings, the question from questions
+  { label: "questions the bullet points already answer", level: 5, sql: `-- two tables in one judgement: the bullet points from listings, the question from questions
 SELECT left(q.text, 70) AS question,
        jev_prob((l.bullets, q.text), 'the bullet points already answer this question') AS covered
 FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE l.title = 'Levi''s Men''s 501 Original-Fit Jean'
 ORDER BY covered DESC
 LIMIT 12;` },
-  { label: "answers that contradict the listing", level: 5, sql: `-- three tables: the answer, its question, and the bullet points it argues with
+  { label: "answers the bullet points could have given", level: 5, sql: `-- three tables: the answer, its question, and the listing's bullet points. A FAQ the seller already wrote.
 SELECT left(q.text, 45) AS question, left(a.text, 60) AS answer
 FROM answers a
 JOIN questions q ON q.id = a.question_id
 JOIN listings l ON l.asin = q.asin
 WHERE l.title = 'Levi''s Men''s 501 Original-Fit Jean' AND q.kind = 'yes-no'
-  AND jev((l.bullets, q.text, a.text), 'the answer contradicts what the bullet points say')
+  AND jev((l.bullets, q.text, a.text), 'the answer could have been found in the bullet points')
 LIMIT 10;` },
   { label: "answers that admit they don't know", level: 5, sql: `SELECT left(q.text, 50) AS question, left(a.text, 60) AS answer
 FROM answers a
