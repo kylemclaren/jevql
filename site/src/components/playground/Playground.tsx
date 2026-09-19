@@ -17,6 +17,36 @@ type Table = { schema: string; name: string; kind: string }
 type TableDetail = { name: string; columns: { name: string; type: string }[] }
 
 const EXAMPLES: { label: string; sql: string }[] = [
+  { label: "what do shoppers ask about a LifeStraw bottle?", sql: `-- 1.6M real Amazon shopper questions (Amazon-PQA). One listing at a time keeps it under the 300-row cap.
+SELECT jev_choice((q.text, l.title), 'What is this shopper asking about?',
+                  ARRAY['filtering and safety', 'capacity or size', 'durability',
+                        'cleaning and maintenance', 'price or shipping', 'something else']) AS topic,
+       count(*)
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE q.asin = 'B00H90PFOK'
+GROUP BY 1
+ORDER BY 2 DESC;` },
+  { label: "grade the model against real yes/no verdicts", sql: `-- verdict is the dataset's own label. How often does the model read the answer the same way?
+SELECT q.verdict AS label,
+       jev_choice((q.text, a.text), 'Does this answer say yes or no to the question?',
+                  ARRAY['yes', 'no', 'neutral']) AS judged,
+       count(*)
+FROM answers a JOIN questions q ON q.id = a.question_id
+WHERE q.asin = 'B07P7VVCDD' AND q.kind = 'yes-no'
+GROUP BY 1, 2
+ORDER BY 1, 3 DESC;` },
+  { label: "questions the listing already answers", sql: `-- two tables in one judgement: the bullet points from listings, the question from questions
+SELECT left(q.text, 70) AS question,
+       jev_prob((l.bullets, q.text), 'the bullet points already answer this question') AS covered
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE q.asin = 'B0018OR118'
+ORDER BY covered DESC
+LIMIT 12;` },
+  { label: "answers that admit they don't know", sql: `SELECT left(q.text, 50) AS question, left(a.text, 60) AS answer
+FROM answers a JOIN questions q ON q.id = a.question_id
+WHERE q.asin = 'B07P7VVCDD'
+  AND jev((q.text, a.text), 'the person answering admits they do not know')
+LIMIT 10;` },
   { label: "urgent tickets that sound angry", sql: `SELECT id, subject, priority
 FROM tickets
 WHERE status = 'open' AND priority IN ('high', 'urgent')
@@ -30,29 +60,19 @@ FROM tickets
 WHERE status = 'open' AND created_at > now() - interval '30 days'
 GROUP BY 1
 ORDER BY 2 DESC;` },
-  { label: "bad reviews that are really about shipping", sql: `SELECT p.name, r.body
-FROM reviews r JOIN products p ON p.id = r.product_id
-WHERE r.stars <= 2 AND p.category = 'kitchen'
-  AND jev((r.title, r.body), 'the complaint is about delivery or packaging, not the product itself')
-LIMIT 10;` },
   { label: "how furious are this month's 1-star reviews?", sql: `SELECT left(body, 70) AS review,
        jev_score((title, body), 'how angry is the reviewer?', ARRAY['calm', 'annoyed', 'furious']) AS anger
 FROM reviews
 WHERE stars = 1 AND created_at > now() - interval '30 days'
 ORDER BY anger DESC
 LIMIT 10;` },
-  { label: "staff who could work from home", sql: `SELECT name, job_title, jev_prob(employees, 'could do this job from home') AS p
-FROM employees
-WHERE department = 'operations'
-ORDER BY p DESC
-LIMIT 12;` },
-  { label: "products good for a camping trip", sql: `SELECT name, price
-FROM products
-WHERE in_stock AND jev((name, description), 'useful on a weekend camping trip')
-ORDER BY price;` },
   { label: "explain before you spend", sql: `-- press Explain (not Run): rows after filters, batches, tokens, cost. No TypeSafe call.
--- Run would judge every open ticket, which the 300-row guard on this node refuses.
-SELECT id, subject FROM tickets WHERE status = 'open' AND jev(tickets, 'mentions a competitor by name');` },
+-- This would judge every question about every Bluetooth speaker: 189,068 rows, about $0.70.
+-- Run refuses it on this node (300-row cap). Add a listing or a brand filter and it fits.
+SELECT q.text
+FROM questions q
+WHERE q.category = 'portable bluetooth speakers'
+  AND jev(q, 'asks whether it is waterproof');` },
 ]
 
 const DEFAULT_NODE = "https://jevql-node.fly.dev"
