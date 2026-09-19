@@ -42,12 +42,62 @@ FROM questions q JOIN listings l ON l.asin = q.asin
 WHERE q.asin = 'B0018OR118'
 ORDER BY covered DESC
 LIMIT 12;` },
+  { label: "is this drone safe for a kid?", sql: `-- a jev() predicate across every Sky Viper listing
+SELECT left(l.title, 40) AS drone, q.text
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Sky Viper'
+  AND jev((l.title, q.text), 'asks whether it is suitable or safe for a child')
+LIMIT 15;` },
+  { label: "pest strip: who is asking about pets and kids?", sql: `-- rank by probability; the dataset's yes/no verdict rides along for comparison
+SELECT left(q.text, 70) AS question, q.verdict,
+       jev_prob(q, 'asks whether it is safe around pets or children') AS p
+FROM questions q
+WHERE q.asin = 'B0019BK8AG' AND q.kind = 'yes-no'
+ORDER BY p DESC
+LIMIT 10;` },
+  { label: "how frustrated are Sims 3 buyers?", sql: `-- jev_score maps an ordered scale to a number you can sort by
+SELECT left(q.text, 70) AS question,
+       jev_score((q.text, l.title), 'How frustrated does the asker sound?',
+                 ARRAY['neutral', 'mildly annoyed', 'frustrated', 'furious']) AS mood
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE q.asin = 'B00C0K4YHI'
+ORDER BY mood DESC
+LIMIT 10;` },
+  { label: "answers that contradict the listing", sql: `-- three tables: the answer, its question, and the bullet points it argues with
+SELECT left(q.text, 45) AS question, left(a.text, 60) AS answer
+FROM answers a
+JOIN questions q ON q.id = a.question_id
+JOIN listings l ON l.asin = q.asin
+WHERE q.asin = 'B0018OR118' AND q.kind = 'yes-no'
+  AND jev((l.bullets, q.text, a.text), 'the answer contradicts what the bullet points say')
+LIMIT 10;` },
   { label: "answers that admit they don't know", sql: `SELECT left(q.text, 50) AS question, left(a.text, 60) AS answer
 FROM answers a JOIN questions q ON q.id = a.question_id
 WHERE q.asin = 'B07P7VVCDD'
   AND jev((q.text, a.text), 'the person answering admits they do not know')
 LIMIT 10;` },
-  { label: "urgent tickets that sound angry", sql: `SELECT id, subject, priority
+  { label: "Versace sunglasses: questions not in English", sql: `SELECT left(l.title, 30) AS listing, q.text
+FROM questions q JOIN listings l ON l.asin = q.asin
+WHERE l.brand = 'Versace'
+  AND jev(q, 'is not written in English')
+LIMIT 15;` },
+  { label: "what are these rugs made of?", sql: `-- judge the listings themselves, not the questions
+SELECT jev_choice((title, bullets), 'What is the rug made of?',
+                  ARRAY['polypropylene or synthetic', 'wool', 'cotton', 'jute or natural fibre', 'not stated']) AS material,
+       count(*)
+FROM listings
+WHERE category = 'area rugs' AND brand = 'Sweet Home Stores'
+GROUP BY 1
+ORDER BY 2 DESC;` },
+  { label: "where is the model unsure?", sql: `-- jev_confidence: the judgements to double-check by hand
+SELECT left(q.text, 70) AS question,
+       jev_confidence(q, 'asks about battery life or run time') AS confidence
+FROM questions q
+WHERE q.asin = 'B079C6JV13'
+ORDER BY confidence
+LIMIT 10;` },
+  { label: "urgent tickets that sound angry", sql: `-- the small demo store: tickets, reviews, staff
+SELECT id, subject, priority
 FROM tickets
 WHERE status = 'open' AND priority IN ('high', 'urgent')
   AND jev((subject, body), 'the customer sounds angry or is threatening to leave')
@@ -60,12 +110,6 @@ FROM tickets
 WHERE status = 'open' AND created_at > now() - interval '30 days'
 GROUP BY 1
 ORDER BY 2 DESC;` },
-  { label: "how furious are this month's 1-star reviews?", sql: `SELECT left(body, 70) AS review,
-       jev_score((title, body), 'how angry is the reviewer?', ARRAY['calm', 'annoyed', 'furious']) AS anger
-FROM reviews
-WHERE stars = 1 AND created_at > now() - interval '30 days'
-ORDER BY anger DESC
-LIMIT 10;` },
   { label: "explain before you spend", sql: `-- press Explain (not Run): rows after filters, batches, tokens, cost. No TypeSafe call.
 -- This would judge every question about every Bluetooth speaker: 189,068 rows, about $0.70.
 -- Run refuses it on this node (300-row cap). Add a listing or a brand filter and it fits.

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"strings"
@@ -61,7 +62,7 @@ func (a *Answer) ConfidenceValue() float64 {
 		if a.Noul >= 0.5 {
 			return a.Noul
 		}
-		return 1 - a.Noul
+		return math.Round((1-a.Noul)*1e4) / 1e4 // 1-0.43 is 0.5700000000000001 in float64
 	}
 	return a.Confidence
 }
